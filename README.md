@@ -20,6 +20,8 @@ cd Jira3
 npm install
 
 # 3. Skonfiguruj .env.local (zobacz INSTALLATION.md)
+#    Szybko: skopiuj plik środowiskowy
+#    cp .env.example .env.local
 # 4. Uruchom SQL w Supabase (supabase-schema.sql)
 # 5. Włącz Realtime w tabelach
 
