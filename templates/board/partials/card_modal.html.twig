@@ -1,0 +1,104 @@
+<div class="modal" id="cardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="card-form">
+                <div class="modal-header align-items-start">
+                    <div>
+                        <h2 class="modal-title fs-5 mb-1" id="cardModalLabel">Szczegóły karty</h2>
+                        <p class="modal-subtitle mb-0 text-muted small">Zarządzaj opisem, deadline'em i pracą nad kartą.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-4">
+                    <input type="hidden" name="cardId" id="card-id">
+                    <input type="hidden" name="columnId" id="card-column-id">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="card-title" class="form-label">Tytuł</label>
+                            <input type="text" class="form-control form-control-lg" id="card-title" name="title" required placeholder="Wpisz nazwę zadania">
+                        </div>
+                        <div class="mb-3">
+                            <label for="card-description" class="form-label">Opis</label>
+                            <textarea class="form-control" id="card-description" name="description" rows="6" placeholder="Dodaj kontekst, wymagania lub notatki"></textarea>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label for="card-due" class="form-label">Deadline</label>
+                                <input type="datetime-local" class="form-control" id="card-due" name="dueAt">
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label" for="card-estimate">Szacowany czas</label>
+                                <input type="text" class="form-control" id="card-estimate" name="estimatedDuration" placeholder="np. 1h 45m">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-4">
+                            <label class="form-label">Przypisani członkowie</label>
+                            <div class="assignee-selector card-pane" id="assignee-selector">
+                                <p class="text-muted small mb-0">Ładuję listę członków…</p>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="card-labels">Etykiety</label>
+                            <input type="text" class="form-control" id="card-labels" name="labels" placeholder="np. backend, priorytet wysoki">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="card-archived" name="archived">
+                            <label class="form-check-label" for="card-archived">Archiwizuj kartę</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="alert alert-danger d-none" id="card-error"></div>
+                    </div>
+                    <div class="col-12" id="comment-section">
+                        <div class="section-header">
+                            <h3 class="h6 mb-1">Komentarze</h3>
+                            <p class="text-muted small mb-0">Dyskusje i aktualizacje zespołu.</p>
+                        </div>
+                        <div class="card-modal-scroll card-pane">
+                            <ul class="list-group list-group-flush" id="card-comments"></ul>
+                        </div>
+                        <div class="mt-3">
+                            <label for="comment-content" class="form-label">Dodaj komentarz</label>
+                            <textarea class="form-control" id="comment-content" rows="3"></textarea>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="add-comment-button">Dodaj komentarz</button>
+                        </div>
+                    </div>
+                    <div class="col-12" id="time-tracking-section">
+                        <div class="section-header">
+                            <h3 class="h6 mb-1">Rejestr czasu</h3>
+                            <p class="text-muted small mb-0">Historia zaangażowania w zadanie.</p>
+                        </div>
+                        <div class="card-modal-scroll card-pane">
+                            <ul class="list-group list-group-flush" id="card-time-entries"></ul>
+                        </div>
+                        <div class="row g-2 align-items-end mt-2">
+                            <div class="col-4">
+                                <label for="time-duration" class="form-label">Czas (np. 1h 20m)</label>
+                                <input type="text" class="form-control" id="time-duration" placeholder="np. 45m">
+                            </div>
+                            <div class="col-8">
+                                <label for="time-note" class="form-label">Notatka</label>
+                                <input type="text" class="form-control" id="time-note">
+                            </div>
+                            <div class="col-12">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="add-time-entry-button">Dodaj wpis</button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" id="delete-card-button">Usuń kartę</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        Zapisz
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

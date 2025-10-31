@@ -1,0 +1,2045 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ board.name }} · Zenith{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .board-hero {
+            position: sticky;
+            z-index: 1020;
+            backdrop-filter: blur(8px);
+            background: linear-gradient(120deg, rgba(36, 43, 66, 0.96), rgba(15, 19, 36, 0.96));
+            box-shadow: 0 28px 70px rgba(4, 9, 20, 0.55);
+            border-bottom: 1px solid rgba(99, 112, 140, 0.3);
+        }
+
+        .board-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1.5rem;
+        }
+
+        .board-actions .btn {
+            border-radius: 999px;
+            padding-inline: 1rem;
+            box-shadow: none;
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .board-actions .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 28px rgba(4, 8, 15, 0.35);
+        }
+
+        .board-actions .btn-outline-light {
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.55);
+        }
+
+        .board-actions .btn-surface {
+            background: rgba(79, 90, 120, 0.25);
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        @media (max-width: 768px) {
+            .board-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .board-actions {
+                width: 100%;
+            }
+
+            .board-actions .btn {
+                flex: 1 1 auto;
+            }
+        }
+
+        .board-wrapper {
+            padding: 2rem 1.5rem 0;
+            background: linear-gradient(180deg, rgba(26, 31, 51, 0.92), rgba(9, 12, 24, 0.98));
+            flex: 1;
+            display: flex;
+        }
+
+        .board-canvas {
+            display: flex;
+            gap: 1.25rem;
+            align-items: flex-start;
+            min-height: calc(100vh - 220px);
+            width: 100%;
+            overflow-y: auto;
+            padding-bottom: 5rem;
+            height: 100%;
+        }
+
+        .kanban-column {
+            background: rgba(19, 26, 43, 0.96);
+            border-radius: 16px;
+            box-shadow: 0 26px 48px rgba(4, 9, 17, 0.65);
+            border: 1px solid rgba(99, 112, 140, 0.22);
+            min-width: 320px;
+            max-width: 320px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .kanban-column[data-status="done"],
+        .kanban-column[data-status="completed"] {
+            background: linear-gradient(195deg, rgba(9, 68, 34, 0.96), rgba(4, 47, 22, 0.95));
+            border-color: rgba(74, 222, 128, 0.6);
+            box-shadow: 0 34px 60px rgba(34, 197, 94, 0.32);
+        }
+
+        .kanban-column[data-status="done"] .kanban-column-header,
+        .kanban-column[data-status="completed"] .kanban-column-header {
+            border-bottom-color: rgba(134, 239, 172, 0.45);
+            background: linear-gradient(180deg, rgba(15, 97, 48, 0.88), rgba(14, 90, 46, 0.6));
+            color: #d1fae5;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+        }
+
+        .kanban-column[data-status="done"] .kanban-card-list,
+        .kanban-column[data-status="completed"] .kanban-card-list {
+            background: rgba(7, 54, 28, 0.45);
+        }
+
+        .kanban-column[data-status="done"] .kanban-card,
+        .kanban-column[data-status="completed"] .kanban-card,
+        .kanban-card.is-completed {
+            background: linear-gradient(180deg, rgba(22, 101, 52, 0.92), rgba(13, 71, 42, 0.9));
+            border-color: rgba(74, 222, 128, 0.45);
+            box-shadow: 0 24px 45px rgba(34, 197, 94, 0.25);
+        }
+
+        .kanban-column[data-status="done"] .kanban-card .kanban-card-title,
+        .kanban-column[data-status="completed"] .kanban-card .kanban-card-title,
+        .kanban-card.is-completed .kanban-card-title {
+            color: #dcfce7;
+        }
+
+        .kanban-card.is-archived {
+            opacity: 0.55;
+            background: linear-gradient(180deg, rgba(24, 30, 48, 0.85), rgba(17, 22, 36, 0.85));
+            border-color: rgba(148, 163, 184, 0.25);
+            box-shadow: 0 12px 28px rgba(2, 6, 12, 0.35);
+        }
+
+        .kanban-card.is-archived .kanban-card-title {
+            text-decoration: line-through;
+            color: rgba(203, 213, 225, 0.7);
+        }
+
+        .badge-archived {
+            background: rgba(148, 163, 184, 0.18);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: rgba(226, 232, 240, 0.75);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-overrun {
+            background: rgba(249, 115, 22, 0.18);
+            border: 1px solid rgba(249, 115, 22, 0.45);
+            color: #fb923c;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline {
+            background: rgba(138, 180, 255, 0.18);
+            border: 1px solid rgba(138, 180, 255, 0.4);
+            color: #dbeafe;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline-warning {
+            background: rgba(251, 191, 36, 0.18);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            color: #fcd34d;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline-overdue {
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            color: #fca5a5;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .kanban-column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1.25rem 0.75rem;
+            border-bottom: 1px solid rgba(99, 112, 140, 0.18);
+        }
+
+        .kanban-card-list {
+            padding: 0.75rem 1.25rem 1.1rem;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .kanban-card {
+            background: linear-gradient(180deg, rgba(37, 47, 70, 0.95), rgba(21, 28, 44, 0.95));
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 18px 34px rgba(3, 8, 16, 0.55);
+            border: 1px solid rgba(109, 125, 158, 0.18);
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            color: #f1f5f9;
+        }
+
+        .kanban-card.time-overrun {
+            border-color: rgba(249, 115, 22, 0.6);
+            box-shadow: 0 26px 48px rgba(249, 115, 22, 0.26);
+            background: linear-gradient(180deg, rgba(54, 33, 20, 0.96), rgba(28, 18, 12, 0.94));
+        }
+
+        .kanban-card.time-overrun .kanban-card-title {
+            color: #fde68a;
+        }
+
+        .kanban-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 26px 42px rgba(6, 12, 24, 0.65);
+        }
+
+        .kanban-card:active {
+            cursor: grabbing;
+        }
+
+        .kanban-card.is-dragging {
+            opacity: 0.6;
+            transform: scale(0.98);
+            box-shadow: 0 30px 48px rgba(9, 16, 32, 0.75);
+            cursor: grabbing;
+        }
+
+        .kanban-card.deadline-warning {
+            background: linear-gradient(180deg, rgba(88, 28, 135, 0.95), rgba(42, 22, 73, 0.9));
+            border-color: rgba(192, 132, 252, 0.65);
+            box-shadow: 0 24px 44px rgba(168, 85, 247, 0.28);
+            color: #f8f3ff;
+        }
+
+        .kanban-card.deadline-warning .kanban-card-meta .badge:not(.badge-deadline-warning):not(.badge-overrun):not(.badge-archived) {
+            background: rgba(216, 180, 254, 0.28) !important;
+            color: #ede9fe !important;
+        }
+
+        .kanban-card.deadline-warning .kanban-card-title {
+            color: #fbe5ff;
+        }
+
+        .kanban-card.deadline-overdue {
+            background: linear-gradient(180deg, rgba(185, 28, 28, 0.95), rgba(99, 21, 21, 0.92));
+            border-color: rgba(248, 113, 113, 0.7);
+            box-shadow: 0 26px 50px rgba(239, 68, 68, 0.3);
+            color: #fff5f5;
+        }
+
+        .kanban-card.deadline-overdue .kanban-card-meta .badge:not(.badge-deadline-overdue):not(.badge-overrun):not(.badge-archived) {
+            background: rgba(252, 165, 165, 0.3) !important;
+            color: #fee2e2 !important;
+        }
+
+        .kanban-card.deadline-overdue .kanban-card-title {
+            color: #fee2e2;
+        }
+
+        .kanban-card.deadline-warning.time-overrun,
+        .kanban-card.deadline-overdue.time-overrun {
+            border-color: rgba(249, 115, 22, 0.75);
+            box-shadow: 0 28px 52px rgba(249, 115, 22, 0.32);
+        }
+
+        .form-control.deadline-input-overdue {
+            background: linear-gradient(180deg, rgba(89, 16, 16, 0.92), rgba(56, 11, 11, 0.9));
+            border-color: rgba(248, 113, 113, 0.7);
+            color: #fee2e2;
+            box-shadow: 0 18px 36px rgba(239, 68, 68, 0.28);
+        }
+
+        .form-control.deadline-input-overdue:focus {
+            background: linear-gradient(180deg, rgba(109, 24, 24, 0.95), rgba(73, 13, 13, 0.94));
+            border-color: rgba(248, 113, 113, 0.85);
+            box-shadow: 0 0 0 0.2rem rgba(248, 113, 113, 0.25);
+            color: #fee2e2;
+        }
+
+        .deadline-input-overdue::-webkit-calendar-picker-indicator {
+            filter: invert(0.85) saturate(1.2);
+        }
+
+        .deadline-label-overdue {
+            color: #fca5a5 !important;
+            text-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+        }
+
+        .kanban-column.is-drop-target {
+            border-color: rgba(138, 180, 255, 0.6);
+            box-shadow: 0 0 0 2px rgba(138, 180, 255, 0.25);
+        }
+
+        .kanban-card-list.is-drop-target {
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 12px;
+        }
+
+        .kanban-card-title {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .kanban-card-labels {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+        }
+
+        .kanban-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.35rem 0.85rem;
+            background: rgba(125, 211, 252, 0.22);
+            color: #e0f2fe;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .kanban-card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .kanban-card-meta .badge {
+            font-weight: 500;
+            background: rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+        }
+
+        .kanban-card-assignees {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.75rem;
+        }
+
+        .kanban-assignee {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.25);
+            color: #e2e8f0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            box-shadow: 0 4px 12px rgba(8, 13, 28, 0.35);
+        }
+
+        .badge.bg-secondary,
+        .badge.text-bg-secondary {
+            background: rgba(148, 163, 184, 0.35) !important;
+            color: #f1f5f9 !important;
+        }
+
+        .badge.text-bg-light {
+            background: rgba(94, 234, 212, 0.2) !important;
+            color: #99f6e4 !important;
+        }
+
+        .role-badge {
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.42rem 0.95rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+
+        .role-badge.role-owner {
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(202, 138, 4, 0.35));
+            color: #fef08a;
+        }
+
+        .role-badge.role-admin {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(22, 163, 74, 0.35));
+            color: #bbf7d0;
+        }
+
+        .role-badge.role-member {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.35));
+            color: #bfdbfe;
+        }
+
+        .board-meta .role-badge {
+            text-transform: uppercase;
+        }
+
+        .assignee-selector {
+            background: rgba(24, 32, 50, 0.85);
+            border: 1px solid rgba(99, 112, 140, 0.35);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .assignee-selector .assignee-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            user-select: none;
+        }
+
+        .assignee-selector .assignee-option:hover {
+            background: rgba(148, 163, 184, 0.08);
+        }
+
+        .assignee-option-main {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .assignee-option-name {
+            color: #f8fafc;
+            font-weight: 600;
+        }
+
+        .assignee-selector .role-badge {
+            padding: 0.25rem 0.6rem;
+            font-size: 0.7rem;
+        }
+
+        .assignee-option-input {
+            flex-shrink: 0;
+            width: 1.1rem;
+            height: 1.1rem;
+            margin: 0;
+            accent-color: #8ab4ff;
+            cursor: pointer;
+        }
+
+        .add-card-button {
+            color: #8ab4ff;
+            padding: 0.75rem 1.25rem;
+            text-align: left;
+            border-top: 1px dashed rgba(99, 112, 140, 0.3);
+        }
+
+        .add-card-button:hover {
+            background: rgba(138, 180, 255, 0.12);
+            color: #d1e3ff;
+        }
+
+        .column-title-input {
+            border: none;
+            background: transparent;
+            padding: 0.25rem 0.5rem;
+            font-weight: 600;
+            width: 180px;
+            color: #f8fafc;
+        }
+
+        .column-title-input:focus {
+            outline: none;
+            box-shadow: none;
+            border-bottom: 2px solid rgba(138, 180, 255, 0.55);
+        }
+
+        .board-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .board-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            color: rgba(226, 232, 240, 0.85);
+        }
+
+        .board-chip {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .board-chip-soft {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .board-description {
+            max-width: 480px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .dropdown-menu {
+            background: rgba(15, 23, 42, 0.98);
+            border: 1px solid rgba(99, 112, 140, 0.3);
+            box-shadow: 0 24px 40px rgba(3, 7, 18, 0.5);
+            color: #e2e8f0;
+        }
+
+        .dropdown-item,
+        .dropdown-item-text {
+            color: #e2e8f0;
+        }
+
+        .dropdown-item:hover,
+        .dropdown-item:focus {
+            background: rgba(148, 163, 184, 0.2);
+            color: #f8fafc;
+        }
+
+        .card-modal-scroll {
+            max-height: 32vh;
+            overflow-y: auto;
+            margin-top: 0.5rem;
+            padding-right: 0.25rem;
+        }
+
+        .card-modal-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .card-modal-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 999px;
+        }
+
+        .card-pane {
+            background: rgba(30, 41, 59, 0.75);
+            border: 1px solid rgba(99, 112, 140, 0.35);
+            border-radius: 14px;
+            padding: 0.75rem;
+            backdrop-filter: blur(6px);
+        }
+
+        .section-header {
+            margin-bottom: 0.5rem;
+        }
+
+        #cardModal .modal-header {
+            border-bottom: 1px solid rgba(99, 112, 140, 0.35);
+            background: rgba(24, 32, 50, 0.94);
+            padding: 1.5rem 1.5rem 1.2rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(8, 12, 24, 0.35);
+        }
+
+        #cardModal .modal-title {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        #cardModal .modal-subtitle {
+            color: rgba(148, 163, 184, 0.78);
+        }
+
+        #cardModal .modal-body {
+            position: relative;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 2.25rem 1.75rem 1.75rem 1.5rem;
+            scroll-padding-top: 2.4rem;
+        }
+
+        #cardModal .modal-body::before {
+            content: '';
+            position: sticky;
+            top: 0;
+            display: block;
+            height: 2.4rem;
+            margin: -2.25rem -1.75rem 0 -1.5rem;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        #cardModal .form-label {
+            font-weight: 700;
+            color: #f8fafc;
+            font-size: 0.95rem;
+            letter-spacing: 0.01em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        #cardModal input:not([type="checkbox"]),
+        #cardModal textarea,
+        #cardModal .form-select {
+            border-radius: 12px;
+            background: rgba(17, 24, 39, 0.78);
+            border-color: rgba(99, 112, 140, 0.35);
+            color: #f8fafc;
+            font-weight: 500;
+        }
+
+        #cardModal input:not([type="checkbox"]):focus,
+        #cardModal textarea:focus,
+        #cardModal .form-select:focus {
+            border-color: rgba(138, 180, 255, 0.75);
+            background: rgba(17, 24, 39, 0.92);
+            box-shadow: 0 0 0 0.125rem rgba(138, 180, 255, 0.25);
+        }
+
+        #cardModal input:not([type="checkbox"])::placeholder,
+        #cardModal textarea::placeholder {
+            color: rgba(203, 213, 225, 0.6);
+            font-weight: 400;
+        }
+
+        #cardModal .form-check {
+            align-items: center;
+            display: flex;
+            gap: 0.5rem;
+            padding-left: 0;
+        }
+
+        #cardModal .form-check-input {
+            flex-shrink: 0;
+            margin: 0;
+            width: 1.2rem;
+            height: 1.2rem;
+            cursor: pointer;
+        }
+
+        #cardModal .form-check-label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        #cardModal .assignee-selector {
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+
+        .list-group-flush > .list-group-item {
+            border: none;
+            padding-left: 0;
+            padding-right: 0;
+            background: transparent;
+            color: #e2e8f0;
+        }
+
+        .list-group-flush > .list-group-item + .list-group-item {
+            border-top: 1px solid rgba(99, 112, 140, 0.35);
+        }
+
+        .list-group-flush li {
+            font-size: 0.9rem;
+        }
+
+        .list-group-item {
+            background: rgba(24, 32, 50, 0.9);
+            border-color: rgba(99, 112, 140, 0.35);
+            color: #e2e8f0;
+        }
+
+        .list-group-item + .list-group-item {
+            border-top: 1px solid rgba(99, 112, 140, 0.35);
+        }
+
+        .list-group-item .text-muted {
+            color: rgba(148, 163, 184, 0.75) !important;
+        }
+
+        .list-group-item-action:hover,
+        .list-group-item-action:focus {
+            background: rgba(51, 65, 85, 0.6);
+            color: #f8fafc;
+        }
+
+        .board-wrapper::-webkit-scrollbar-thumb,
+        .kanban-card-list::-webkit-scrollbar-thumb {
+            background-color: rgba(148, 163, 184, 0.35);
+            border-radius: 999px;
+        }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        (function () {
+            const api = window.Zenith;
+            if (!api?.registerInit || !api?.utils) {
+                return;
+            }
+
+            const {
+                fetchJson,
+                toggleLoading,
+                showError,
+                hideError,
+                safeJsonParse,
+                parseDurationInput,
+                formatDuration,
+                formatDate,
+                formatInputDate,
+                escapeHtml,
+                getInitials,
+            } = api.utils;
+
+            const DEADLINE_SOON_THRESHOLD_MINUTES = 24 * 60;
+
+            api.registerInit(() => {
+                const wrapper = document.querySelector('.board-wrapper');
+                if (!wrapper) {
+                    return;
+                }
+
+                const boardCanvas = wrapper.querySelector('#board-canvas');
+                if (!boardCanvas) {
+                    return;
+                }
+
+                let boardState = safeJsonParse(wrapper.dataset.board) ?? {};
+                const boardId = Number(wrapper.dataset.boardId);
+                const updatesUrl = wrapper.dataset.updates;
+                const updatesCursorRaw = wrapper.dataset.updatesCursor ?? '';
+                let updatesCursor = Number.parseInt(updatesCursorRaw, 10);
+                if (!Number.isFinite(updatesCursor) || updatesCursor <= 0) {
+                    updatesCursor = null;
+                }
+                const addColumnButton = document.getElementById('add-column-button');
+                const manageMembersButton = document.getElementById('manage-members-button');
+                const membersDropdown = document.getElementById('members-dropdown');
+                const memberCountEl = document.getElementById('member-count');
+                const membersModalEl = document.getElementById('membersModal');
+                const membersModal = membersModalEl && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(membersModalEl) : null;
+                const memberForm = document.getElementById('member-form');
+                const memberErrorBox = document.getElementById('member-error');
+                const memberList = document.getElementById('member-list');
+                const deleteBoardButton = document.getElementById('delete-board-button');
+                const columnModalEl = document.getElementById('columnModal');
+                const columnModal = columnModalEl && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(columnModalEl) : null;
+                const columnForm = document.getElementById('column-form');
+                const columnErrorBox = document.getElementById('column-error');
+                const cardModalEl = document.getElementById('cardModal');
+                const cardModal = cardModalEl && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(cardModalEl) : null;
+                const cardForm = document.getElementById('card-form');
+                const cardErrorBox = document.getElementById('card-error');
+                const assigneeSelector = document.getElementById('assignee-selector');
+                const deleteCardButton = document.getElementById('delete-card-button');
+                const addCommentButton = document.getElementById('add-comment-button');
+                const addTimeEntryButton = document.getElementById('add-time-entry-button');
+                const commentSection = document.getElementById('comment-section');
+                const timeTrackingSection = document.getElementById('time-tracking-section');
+                const timeDurationInput = document.getElementById('time-duration');
+                const deadlineField = document.getElementById('card-due');
+                const deadlineLabel = document.querySelector('label[for="card-due"]');
+
+                const dragState = {
+                    cardId: null,
+                    sourceColumnId: null,
+                    sourcePosition: null,
+                    activeDropColumn: null,
+                    activeDropList: null,
+                };
+
+                const cardModalState = {
+                    isOpening: false,
+                };
+
+                if (deadlineField) {
+                    deadlineField.addEventListener('change', () => updateDeadlineFieldState(deadlineField));
+                    deadlineField.addEventListener('input', () => updateDeadlineFieldState(deadlineField));
+                    updateDeadlineFieldState(deadlineField);
+                }
+
+                renderBoard(boardState);
+                renderMembers(boardState);
+                renderAssigneeSelector();
+                startRealtimeUpdates(updatesUrl, updateBoard);
+
+                if (manageMembersButton && membersModal) {
+                    manageMembersButton.addEventListener('click', () => {
+                        hideError(memberErrorBox);
+                        renderMembers(boardState);
+                        membersModal.show();
+                        memberForm?.email?.focus();
+                    });
+                }
+
+                if (memberForm) {
+                    memberForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        hideError(memberErrorBox);
+                        const submitBtn = memberForm.querySelector('button[type="submit"]');
+                        const spinner = submitBtn?.querySelector('.spinner-border');
+                        toggleLoading(submitBtn, spinner, true);
+
+                        const email = memberForm.email.value.trim();
+                        const role = memberForm.role.value;
+                        if (!email) {
+                            showError(memberErrorBox, 'Podaj adres e-mail użytkownika.');
+                            toggleLoading(submitBtn, spinner, false);
+                            return;
+                        }
+
+                        try {
+                            await fetchJson(`/api/boards/${boardId}/members`, {
+                                method: 'POST',
+                                body: JSON.stringify({ email, role }),
+                            });
+                            memberForm.reset();
+                            memberForm.role.value = 'member';
+                            await refreshBoard();
+                        } catch (error) {
+                            showError(memberErrorBox, error.message ?? 'Nie udało się dodać użytkownika.');
+                        } finally {
+                            toggleLoading(submitBtn, spinner, false);
+                        }
+                    });
+                }
+
+                if (memberList) {
+                    memberList.addEventListener('click', async (event) => {
+                        const button = event.target.closest('[data-action="remove-member"]');
+                        if (!button) {
+                            return;
+                        }
+                        const userId = button.dataset.userId;
+                        if (!userId) {
+                            return;
+                        }
+                        if (!window.confirm('Czy na pewno chcesz usunąć tego członka z tablicy?')) {
+                            return;
+                        }
+                        try {
+                            await fetchJson(`/api/boards/${boardId}/members/${userId}`, {
+                                method: 'DELETE',
+                            });
+                            await refreshBoard();
+                        } catch (error) {
+                            alert(error.message ?? 'Nie udało się usunąć członka.');
+                        }
+                    });
+                }
+
+                if (deleteBoardButton) {
+                    deleteBoardButton.addEventListener('click', async () => {
+                        if (!window.confirm('Usunięcie tablicy jest nieodwracalne. Kontynuować?')) {
+                            return;
+                        }
+                        deleteBoardButton.disabled = true;
+                        try {
+                            await fetchJson(`/api/boards/${boardId}`, { method: 'DELETE' });
+                            window.location.href = '/boards';
+                        } catch (error) {
+                            deleteBoardButton.disabled = false;
+                            alert(error.message ?? 'Nie udało się usunąć tablicy.');
+                        }
+                    });
+                }
+
+                if (addColumnButton) {
+                    addColumnButton.addEventListener('click', () => openColumnModal());
+                }
+
+                if (columnForm) {
+                    columnForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        hideError(columnErrorBox);
+                        const submitBtn = columnForm.querySelector('button[type="submit"]');
+                        const spinner = submitBtn?.querySelector('.spinner-border');
+                        toggleLoading(submitBtn, spinner, true);
+
+                        const columnId = columnForm.columnId.value;
+                        const title = columnForm.title.value.trim();
+                        if (!title) {
+                            showError(columnErrorBox, 'Podaj nazwę kolumny.');
+                            toggleLoading(submitBtn, spinner, false);
+                            return;
+                        }
+
+                        try {
+                            if (columnId) {
+                                await fetchJson(`/api/columns/${columnId}`, {
+                                    method: 'PATCH',
+                                    body: JSON.stringify({ title }),
+                                });
+                            } else {
+                                await fetchJson(`/api/boards/${boardId}/columns`, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ title }),
+                                });
+                            }
+
+                            if (columnModal) {
+                                columnModal.hide();
+                            }
+                            columnForm.reset();
+                            await refreshBoard();
+                        } catch (error) {
+                            showError(columnErrorBox, error.message ?? 'Nie udało się zapisać kolumny.');
+                        } finally {
+                            toggleLoading(submitBtn, spinner, false);
+                        }
+                    });
+                }
+
+                boardCanvas.addEventListener('click', (event) => {
+                    const target = event.target;
+
+                    const addButton = target.closest('.add-card-button');
+                    if (addButton) {
+                        const columnId = addButton.dataset.columnId;
+                        openCardModal({ columnId });
+                        return;
+                    }
+
+                    const deleteColumnButton = target.closest('[data-action="delete-column"]');
+                    if (deleteColumnButton) {
+                        const columnId = deleteColumnButton.dataset.columnId;
+                        confirmDeleteColumn(columnId);
+                        return;
+                    }
+
+                    const cardElement = target.closest('.kanban-card');
+                    if (cardElement) {
+                        const cardId = cardElement.dataset.cardId;
+                        openCardModal({ cardId });
+                    }
+                });
+
+                boardCanvas.addEventListener('focusout', async (event) => {
+                    const input = event.target;
+                    if (!input.classList.contains('column-title-input')) {
+                        return;
+                    }
+                    const columnId = input.dataset.columnId;
+                    const title = input.value.trim();
+                    if (!columnId || !title) {
+                        return;
+                    }
+                    try {
+                        await fetchJson(`/api/columns/${columnId}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ title }),
+                        });
+                    } catch (error) {
+                        console.error(error);
+                    }
+                });
+
+                boardCanvas.addEventListener('dragstart', handleDragStart);
+                boardCanvas.addEventListener('dragover', handleDragOver);
+                boardCanvas.addEventListener('drop', handleDrop);
+                boardCanvas.addEventListener('dragend', handleDragEnd);
+
+                if (cardForm) {
+                    cardForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        hideError(cardErrorBox);
+                        const submitBtn = cardForm.querySelector('button[type="submit"]');
+                        const spinner = submitBtn?.querySelector('.spinner-border');
+                        toggleLoading(submitBtn, spinner, true);
+
+                        const cardId = cardForm.cardId.value;
+                        const columnId = cardForm.columnId.value;
+                        let payload;
+                        try {
+                            payload = collectCardPayload(cardForm);
+                        } catch (error) {
+                            toggleLoading(submitBtn, spinner, false);
+                            showError(cardErrorBox, error.message ?? 'Nieprawidłowy czas.');
+                            return;
+                        }
+
+                        try {
+                            if (cardId) {
+                                await fetchJson(`/api/cards/${cardId}`, {
+                                    method: 'PATCH',
+                                    body: JSON.stringify(payload),
+                                });
+                            } else {
+                                if (!columnId) {
+                                    throw new Error('Brak kolumny docelowej.');
+                                }
+                                await fetchJson(`/api/columns/${columnId}/cards`, {
+                                    method: 'POST',
+                                    body: JSON.stringify(payload),
+                                });
+                            }
+
+                            if (cardModal) {
+                                cardModal.hide();
+                            }
+                            await refreshBoard();
+                        } catch (error) {
+                            showError(cardErrorBox, error.message ?? 'Nie udało się zapisać karty.');
+                        } finally {
+                            toggleLoading(submitBtn, spinner, false);
+                        }
+                    });
+                }
+
+                if (deleteCardButton) {
+                    deleteCardButton.addEventListener('click', async () => {
+                        const cardId = cardForm?.cardId.value;
+                        if (!cardId || !window.confirm('Czy na pewno chcesz usunąć tę kartę?')) {
+                            return;
+                        }
+                        try {
+                            await fetchJson(`/api/cards/${cardId}`, { method: 'DELETE' });
+                            if (cardModal) {
+                                cardModal.hide();
+                            }
+                            await refreshBoard();
+                        } catch (error) {
+                            showError(cardErrorBox, error.message ?? 'Nie udało się usunąć karty.');
+                        }
+                    });
+                }
+
+                if (addCommentButton) {
+                    addCommentButton.addEventListener('click', async () => {
+                        const cardId = cardForm?.cardId.value;
+                        const contentEl = document.getElementById('comment-content');
+                        if (!cardId || !contentEl) {
+                            return;
+                        }
+                        const content = contentEl.value.trim();
+                        if (!content) {
+                            return;
+                        }
+                        try {
+                            const comments = await fetchJson(`/api/cards/${cardId}/comments`, {
+                                method: 'POST',
+                                body: JSON.stringify({ content }),
+                            });
+                            renderComments(comments);
+                            contentEl.value = '';
+                            await refreshBoard();
+                        } catch (error) {
+                            alert(error.message ?? 'Nie udało się dodać komentarza.');
+                        }
+                    });
+                }
+
+                if (addTimeEntryButton) {
+                    addTimeEntryButton.addEventListener('click', async () => {
+                        const cardId = cardForm?.cardId.value;
+                        const noteEl = document.getElementById('time-note');
+                        if (!cardId) {
+                            return;
+                        }
+                        const { minutes, error } = parseDurationInput(timeDurationInput?.value ?? '');
+                        if (error) {
+                            alert(error);
+                            return;
+                        }
+                        if (!minutes || minutes <= 0) {
+                            return;
+                        }
+                        try {
+                            const entries = await fetchJson(`/api/cards/${cardId}/time-entries`, {
+                                method: 'POST',
+                                body: JSON.stringify({ minutes, note: noteEl?.value ?? null }),
+                            });
+                            renderTimeEntries(entries);
+                            if (timeDurationInput) {
+                                timeDurationInput.value = '';
+                            }
+                            if (noteEl) {
+                                noteEl.value = '';
+                            }
+                            await refreshBoard();
+                        } catch (error) {
+                            alert(error.message ?? 'Nie udało się zapisać czasu.');
+                        }
+                    });
+                }
+
+                function updateBoard(snapshot) {
+                    if (!snapshot) {
+                        return;
+                    }
+                    boardState = snapshot;
+                    renderBoard(boardState);
+                    renderMembers(boardState);
+                    renderAssigneeSelector(getSelectedAssigneeIds());
+                }
+
+                function toIdSet(values) {
+                    const set = new Set();
+                    if (!Array.isArray(values)) {
+                        return set;
+                    }
+                    values.forEach((value) => {
+                        if (value === null || value === undefined) {
+                            return;
+                        }
+                        if (typeof value === 'object' && 'id' in value && value.id !== null && value.id !== undefined) {
+                            set.add(String(value.id));
+                        } else if (typeof value === 'number' || typeof value === 'string') {
+                            const normalized = String(value).trim();
+                            if (normalized !== '') {
+                                set.add(normalized);
+                            }
+                        }
+                    });
+                    return set;
+                }
+
+                function getSelectedAssigneeIds() {
+                    if (!assigneeSelector) {
+                        return [];
+                    }
+                    return Array.from(assigneeSelector.querySelectorAll('input[name="assigneeIds[]"]:checked')).map((input) => input.value);
+                }
+
+                function renderAssigneeSelector(selected = []) {
+                    if (!assigneeSelector) {
+                        return;
+                    }
+
+                    const members = Array.isArray(boardState?.members) ? boardState.members.slice() : [];
+                    const selectedIds = toIdSet(selected);
+
+                    assigneeSelector.innerHTML = '';
+
+                    if (members.length === 0) {
+                        assigneeSelector.innerHTML = '<p class="text-muted small mb-0">Brak członków na tej tablicy.</p>';
+                        return;
+                    }
+
+                    members.sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }));
+
+                    const fragment = document.createDocumentFragment();
+
+                    members.forEach((member) => {
+                        const role = member.role ?? 'member';
+                        const option = document.createElement('label');
+                        option.className = 'assignee-option';
+                        option.dataset.memberId = String(member.id);
+
+                        const main = document.createElement('span');
+                        main.className = 'assignee-option-main';
+
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.name = 'assigneeIds[]';
+                        input.value = String(member.id);
+                        input.className = 'assignee-option-input';
+                        input.checked = selectedIds.has(String(member.id));
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'assignee-option-name';
+                        nameSpan.textContent = member.displayName ?? '';
+
+                        main.append(input, nameSpan);
+                        option.append(main);
+
+                        const badge = document.createElement('span');
+                        badge.className = `badge role-badge role-${role}`;
+                        badge.textContent = memberRoleLabel(role);
+                        option.append(badge);
+
+                        fragment.append(option);
+                    });
+
+                    assigneeSelector.appendChild(fragment);
+                }
+
+                function deriveColumnStatus(column, columnIndex, columnCount) {
+                    if (column && typeof column.status === 'string' && column.status.trim()) {
+                        return column.status.trim().toLowerCase();
+                    }
+                    const title = typeof column?.title === 'string' ? column.title.toLowerCase() : '';
+                    if (title) {
+                        if (!title.includes('incomplete')) {
+                            const doneKeywords = [
+                                'done',
+                                'completed',
+                                'complete',
+                                'finish',
+                                'finished',
+                                'ready',
+                                'zrobione',
+                                'zrobiony',
+                                'zrobiona',
+                                'ukończone',
+                                'ukończona',
+                                'ukończony',
+                                'skonczone',
+                                'skończone',
+                                'gotowe',
+                                'zamkniete',
+                                'zamknięte',
+                                'final',
+                                'archiwum'
+                            ];
+                            if (doneKeywords.some((keyword) => title.includes(keyword))) {
+                                return 'done';
+                            }
+                        }
+                    }
+                    if (typeof columnCount === 'number' && columnCount > 0 && columnIndex === columnCount - 1) {
+                        return 'done';
+                    }
+                    return '';
+                }
+
+                function renderBoard(state) {
+                    if (!state || !boardCanvas) {
+                        return;
+                    }
+
+                    const columns = [...(state.columns ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+                    const columnCount = columns.length;
+                    const html = columns.map((column, columnIndex) => {
+                        const columnStatus = deriveColumnStatus(column, columnIndex, columnCount);
+                        const cards = [...(column.cards ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+                        const cardsHtml = cards.map((card) => {
+                            const estimatedMinutes = Number(card.estimatedMinutes ?? 0);
+                            const trackedMinutes = Number(card.trackedMinutes ?? 0);
+                            const hasEstimate = Number.isFinite(estimatedMinutes) && estimatedMinutes > 0;
+                            const hasTracked = trackedMinutes > 0;
+                            const hasTimeOverrun = hasEstimate && trackedMinutes > estimatedMinutes;
+                            const overrunMinutes = hasTimeOverrun ? trackedMinutes - estimatedMinutes : 0;
+                            const deadlineClass = calculateDeadlineClass(card.dueAt);
+
+                            const metaBadges = [];
+                            if (card.dueAt) {
+                                const dueLabel = formatDate(card.dueAt);
+                                if (deadlineClass === 'deadline-overdue') {
+                                    metaBadges.push(`<span class="badge badge-deadline-overdue">Po terminie: ${dueLabel}</span>`);
+                                } else if (deadlineClass === 'deadline-warning') {
+                                    metaBadges.push(`<span class="badge badge-deadline-warning">Deadline blisko: ${dueLabel}</span>`);
+                                } else {
+                                    metaBadges.push(`<span class="badge badge-deadline">Deadline: ${dueLabel}</span>`);
+                                }
+                            }
+
+                            if (hasEstimate) {
+                                metaBadges.push(`<span class="badge text-bg-secondary">Szacunek: ${formatDuration(estimatedMinutes)}</span>`);
+                            }
+                            if (hasTracked) {
+                                const timeLabel = hasTimeOverrun
+                                    ? `Czas: ${formatDuration(trackedMinutes)} (+${formatDuration(overrunMinutes)})`
+                                    : `Czas: ${formatDuration(trackedMinutes)}`;
+                                const timeBadgeClass = hasTimeOverrun ? 'badge badge-overrun' : 'badge text-bg-secondary';
+                                metaBadges.push(`<span class="${timeBadgeClass}">${timeLabel}</span>`);
+                            }
+                            if (card.commentCount > 0) {
+                                metaBadges.push(`<span class="badge text-bg-secondary">Komentarze: ${card.commentCount}</span>`);
+                            }
+
+                            const cardClasses = ['kanban-card'];
+                            if (card.archived) {
+                                cardClasses.push('is-archived');
+                            }
+                            if (hasTimeOverrun) {
+                                cardClasses.push('time-overrun');
+                            }
+                            if (deadlineClass) {
+                                cardClasses.push(deadlineClass);
+                            }
+                            if (columnStatus === 'done' || columnStatus === 'completed') {
+                                cardClasses.push('is-completed');
+                            }
+                            if (card.archived) {
+                                metaBadges.push('<span class="badge badge-archived">Zarchiwizowana</span>');
+                            }
+                            const assigneeHtml = renderAssignees(card.assignees);
+                            return `
+                                <article class="${cardClasses.join(' ')}" data-card-id="${card.id}" data-position="${card.position ?? 0}" draggable="true">
+                                    <h3 class="kanban-card-title">${escapeHtml(card.title)}</h3>
+                                    ${renderLabels(card.labels)}
+                                    ${metaBadges.length ? `<div class="kanban-card-meta">${metaBadges.join('')}</div>` : ''}
+                                    ${assigneeHtml}
+                                </article>
+                            `;
+                        }).join('');
+
+                        return `
+                            <div class="kanban-column" data-column-id="${column.id}" data-status="${columnStatus}">
+                                <div class="kanban-column-header">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input class="form-control form-control-sm column-title-input" data-column-id="${column.id}" value="${escapeHtml(column.title)}">
+                                        <span class="badge bg-secondary">${column.cards?.length ?? 0}</span>
+                                    </div>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">•••</button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><button class="dropdown-item text-danger" data-action="delete-column" data-column-id="${column.id}">Usuń kolumnę</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="kanban-card-list" data-column-id="${column.id}">
+                                    ${cardsHtml || '<div class="text-muted small">Dodaj kartę, aby rozpocząć.</div>'}
+                                </div>
+                                <button class="btn btn-link w-100 text-start text-decoration-none add-card-button" data-column-id="${column.id}">+ Dodaj kartę</button>
+                            </div>
+                        `;
+                    }).join('');
+
+                    boardCanvas.innerHTML = html;
+                }
+
+                function calculateDeadlineClass(dueAt) {
+                    if (!dueAt) {
+                        return '';
+                    }
+                    const dueDate = new Date(dueAt);
+                    const dueTime = dueDate.getTime();
+                    if (!Number.isFinite(dueTime)) {
+                        return '';
+                    }
+                    const now = new Date();
+                    const nowTime = now.getTime();
+                    if (dueTime < nowTime) {
+                        return 'deadline-overdue';
+                    }
+                    const diffMinutes = (dueTime - nowTime) / 60000;
+                    if (diffMinutes <= DEADLINE_SOON_THRESHOLD_MINUTES) {
+                        return 'deadline-warning';
+                    }
+                    return '';
+                }
+
+                function updateDeadlineFieldState(inputElement) {
+                    if (!inputElement) {
+                        return;
+                    }
+                    const rawValue = inputElement.value;
+                    let isoValue = null;
+                    if (rawValue) {
+                        const parsedDate = new Date(rawValue);
+                        const parsedTime = parsedDate.getTime();
+                        if (Number.isFinite(parsedTime)) {
+                            isoValue = parsedDate.toISOString();
+                        }
+                    }
+                    const deadlineClass = isoValue ? calculateDeadlineClass(isoValue) : '';
+                    const isOverdue = deadlineClass === 'deadline-overdue';
+                    inputElement.classList.toggle('deadline-input-overdue', isOverdue);
+                    if (deadlineLabel) {
+                        deadlineLabel.classList.toggle('deadline-label-overdue', isOverdue);
+                    }
+                }
+
+                function renderMembers(state) {
+                    const members = Array.isArray(state?.members) ? state.members : [];
+                    if (memberCountEl) {
+                        memberCountEl.textContent = members.length;
+                    }
+                    if (membersDropdown) {
+                        if (members.length === 0) {
+                            membersDropdown.innerHTML = '<span class="dropdown-item-text text-muted">Brak członków</span>';
+                        } else {
+                            membersDropdown.innerHTML = members.map((member) => {
+                                const roleSuffix = member.role && member.role !== 'member' ? ` <small class="text-muted">(${escapeHtml(member.role)})</small>` : '';
+                                return `<span class="dropdown-item-text">${escapeHtml(member.displayName)}${roleSuffix}</span>`;
+                            }).join('');
+                        }
+                    }
+                    if (memberList) {
+                        if (members.length === 0) {
+                            memberList.innerHTML = '<li class="list-group-item text-muted">Brak innych członków.</li>';
+                        } else {
+                            memberList.innerHTML = members.map((member) => {
+                                const roleLabel = memberRoleLabel(member.role);
+                                const removable = member.role !== 'owner';
+                                const actionButton = removable
+                                    ? `<button class="btn btn-outline-danger btn-sm" data-action="remove-member" data-user-id="${member.id}">Usuń</button>`
+                                    : '';
+                                return `<li class="list-group-item d-flex align-items-center justify-content-between" data-user-id="${member.id}">
+                                    <div>
+                                        <div class="fw-semibold">${escapeHtml(member.displayName)}</div>
+                                        <div class="small text-muted">${roleLabel}</div>
+                                    </div>
+                                    ${actionButton}
+                                </li>`;
+                            }).join('');
+                        }
+                    }
+                }
+
+                function memberRoleLabel(role) {
+                    switch (role) {
+                        case 'owner':
+                            return 'Właściciel';
+                        case 'admin':
+                            return 'Administrator';
+                        default:
+                            return 'Członek';
+                    }
+                }
+
+                function setCardModalMode(isEditing) {
+                    if (deleteCardButton) {
+                        deleteCardButton.classList.toggle('d-none', !isEditing);
+                        deleteCardButton.disabled = !isEditing;
+                    }
+                    if (commentSection) {
+                        commentSection.classList.toggle('d-none', !isEditing);
+                    }
+                    if (timeTrackingSection) {
+                        timeTrackingSection.classList.toggle('d-none', !isEditing);
+                    }
+                    if (addCommentButton) {
+                        addCommentButton.disabled = !isEditing;
+                    }
+                    if (addTimeEntryButton) {
+                        addTimeEntryButton.disabled = !isEditing;
+                    }
+                    if (!isEditing && timeDurationInput) {
+                        timeDurationInput.value = '';
+                    }
+                    const timeNoteEl = document.getElementById('time-note');
+                    if (!isEditing && timeNoteEl) {
+                        timeNoteEl.value = '';
+                    }
+                }
+
+                async function confirmDeleteColumn(columnId) {
+                    if (!columnId) {
+                        return;
+                    }
+                    if (!window.confirm('Czy na pewno chcesz usunąć tę kolumnę?')) {
+                        return;
+                    }
+                    try {
+                        await fetchJson(`/api/columns/${columnId}`, { method: 'DELETE' });
+                        await refreshBoard();
+                    } catch (error) {
+                        alert(error.message ?? 'Nie udało się usunąć kolumny.');
+                    }
+                }
+
+                function openColumnModal(columnId = null) {
+                    if (!columnModalEl || !columnModal || !columnForm) {
+                        return;
+                    }
+                    columnForm.reset();
+                    hideError(columnErrorBox);
+                    columnForm.columnId.value = columnId ?? '';
+                    columnModalEl.querySelector('#columnModalLabel').textContent = columnId ? 'Edytuj kolumnę' : 'Nowa kolumna';
+
+                    if (columnId) {
+                        const column = boardState.columns?.find((col) => String(col.id) === String(columnId));
+                        if (column) {
+                            columnForm.title.value = column.title;
+                        }
+                    }
+
+                    columnModal.show();
+                    columnForm.title.focus();
+                }
+
+                async function openCardModal({ cardId = null, columnId = null }) {
+                    if (!cardForm || !cardModal) {
+                        return;
+                    }
+                    if (cardModalState.isOpening) {
+                        return;
+                    }
+                    cardModalState.isOpening = true;
+                    try {
+                        cardForm.reset();
+                        if (cardForm.dueAt) {
+                            updateDeadlineFieldState(cardForm.dueAt);
+                        }
+                        hideError(cardErrorBox);
+                        renderComments([]);
+                        renderTimeEntries([]);
+                        renderAssigneeSelector();
+                        cardForm.cardId.value = cardId ?? '';
+                        cardForm.columnId.value = columnId ?? '';
+                        setCardModalMode(false);
+
+                        if (cardId) {
+                            try {
+                                const { card, comments, timeEntries } = await fetchJson(`/api/cards/${cardId}`);
+                                fillCardForm(cardForm, card);
+                                renderComments(comments);
+                                renderTimeEntries(timeEntries);
+                                renderAssigneeSelector(card.assignees ?? []);
+                                setCardModalMode(true);
+                            } catch (error) {
+                                alert(error.message ?? 'Nie udało się załadować karty.');
+                                setCardModalMode(false);
+                                return;
+                            }
+                        }
+
+                        cardModal.show();
+                        cardForm.title.focus();
+                    } finally {
+                        cardModalState.isOpening = false;
+                    }
+                }
+
+                function renderComments(comments) {
+                    const container = document.getElementById('card-comments');
+                    if (!container) {
+                        return;
+                    }
+                    container.innerHTML = '';
+                    comments?.forEach((comment) => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.innerHTML = `<div class="fw-semibold">${escapeHtml(comment.author.displayName)}</div>
+                            <div class="small text-muted">${formatDate(comment.createdAt)}</div>
+                            <p class="mb-0">${escapeHtml(comment.content)}</p>`;
+                        container.appendChild(li);
+                    });
+                }
+
+                function renderTimeEntries(entries) {
+                    const container = document.getElementById('card-time-entries');
+                    if (!container) {
+                        return;
+                    }
+                    container.innerHTML = '';
+                    entries?.forEach((entry) => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        const durationText = formatDuration(entry.minutesSpent);
+                        li.innerHTML = `<div class="fw-semibold">${escapeHtml(entry.author.displayName)}</div>
+                            <div class="small text-muted">${formatDate(entry.loggedAt)}</div>
+                            <p class="mb-0">${durationText ? `${durationText} (${entry.minutesSpent} min)` : `${entry.minutesSpent} min`}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}</p>`;
+                        container.appendChild(li);
+                    });
+                }
+
+                function handleDragStart(event) {
+                    const cardEl = event.target.closest('.kanban-card');
+                    if (!cardEl) {
+                        return;
+                    }
+                    const columnEl = cardEl.closest('.kanban-column');
+                    if (!columnEl) {
+                        return;
+                    }
+                    const cardId = cardEl.dataset.cardId;
+                    const columnId = columnEl.dataset.columnId;
+                    if (!cardId || !columnId) {
+                        return;
+                    }
+                    dragState.cardId = cardId;
+                    dragState.sourceColumnId = columnId;
+                    const listEl = columnEl.querySelector('.kanban-card-list');
+                    const cards = listEl ? Array.from(listEl.querySelectorAll('.kanban-card')) : [];
+                    const initialIndex = cards.findIndex((node) => node.dataset.cardId === cardId);
+                    dragState.sourcePosition = initialIndex === -1 ? 0 : initialIndex;
+                    if (event.dataTransfer) {
+                        event.dataTransfer.effectAllowed = 'move';
+                        try {
+                            event.dataTransfer.setData('text/plain', cardId);
+                        } catch (error) {
+                            /* ignore */
+                        }
+                    }
+                    cardEl.classList.add('is-dragging');
+                }
+
+                function handleDragOver(event) {
+                    if (!dragState.cardId) {
+                        return;
+                    }
+                    const columnEl = event.target.closest('.kanban-column');
+                    if (!columnEl) {
+                        return;
+                    }
+                    const listEl = columnEl.querySelector('.kanban-card-list');
+                    if (!listEl) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (event.dataTransfer) {
+                        event.dataTransfer.dropEffect = 'move';
+                    }
+                    if (dragState.activeDropColumn && dragState.activeDropColumn !== columnEl) {
+                        dragState.activeDropColumn.classList.remove('is-drop-target');
+                    }
+                    if (dragState.activeDropList && dragState.activeDropList !== listEl) {
+                        dragState.activeDropList.classList.remove('is-drop-target');
+                    }
+                    dragState.activeDropColumn = columnEl;
+                    dragState.activeDropList = listEl;
+                    columnEl.classList.add('is-drop-target');
+                    listEl.classList.add('is-drop-target');
+                }
+
+                async function handleDrop(event) {
+                    if (!dragState.cardId) {
+                        return;
+                    }
+                    const columnEl = event.target.closest('.kanban-column');
+                    if (!columnEl) {
+                        clearDragState();
+                        return;
+                    }
+                    event.preventDefault();
+                    const listEl = columnEl.querySelector('.kanban-card-list');
+                    const targetColumnId = columnEl.dataset.columnId;
+                    if (!listEl || !targetColumnId) {
+                        clearDragState();
+                        return;
+                    }
+                    const { cardId, sourceColumnId, sourcePosition } = dragState;
+                    const targetPosition = calculateDropPosition(listEl, event.clientY, cardId);
+                    const sameLocation = targetColumnId === sourceColumnId && targetPosition === sourcePosition;
+                    let localMoveApplied = false;
+                    if (!sameLocation) {
+                        localMoveApplied = moveCardLocally(cardId, sourceColumnId, targetColumnId, targetPosition);
+                    }
+                    clearDragState();
+                    if (!cardId || !sourceColumnId || sameLocation) {
+                        return;
+                    }
+                    if (localMoveApplied) {
+                        renderBoard(boardState);
+                    }
+                    const payload = {
+                        targetColumnId: Number(targetColumnId),
+                        targetPosition,
+                    };
+                    try {
+                        await fetchJson(`/api/cards/${cardId}/move`, {
+                            method: 'PATCH',
+                            body: JSON.stringify(payload),
+                        });
+                        await refreshBoard();
+                    } catch (error) {
+                        alert(error.message ?? 'Nie udało się przenieść karty.');
+                        await refreshBoard();
+                    }
+                }
+
+                function handleDragEnd() {
+                    clearDragState();
+                }
+
+                function calculateDropPosition(listElement, clientY, draggedCardId) {
+                    const cards = Array.from(listElement.querySelectorAll('.kanban-card')).filter((element) => element.dataset.cardId !== draggedCardId);
+                    if (cards.length === 0) {
+                        return 0;
+                    }
+                    for (let index = 0; index < cards.length; index += 1) {
+                        const cardEl = cards[index];
+                        const rect = cardEl.getBoundingClientRect();
+                        if (Number.isFinite(clientY) && clientY < rect.top + rect.height / 2) {
+                            return index;
+                        }
+                    }
+                    return cards.length;
+                }
+
+                function moveCardLocally(cardId, sourceColumnId, targetColumnId, targetPosition) {
+                    if (!boardState || !Array.isArray(boardState.columns)) {
+                        return false;
+                    }
+                    const sourceColumn = boardState.columns.find((column) => String(column.id) === String(sourceColumnId));
+                    const targetColumn = boardState.columns.find((column) => String(column.id) === String(targetColumnId));
+                    if (!sourceColumn || !targetColumn) {
+                        return false;
+                    }
+                    if (!Array.isArray(sourceColumn.cards)) {
+                        sourceColumn.cards = [];
+                    }
+                    if (!Array.isArray(targetColumn.cards)) {
+                        targetColumn.cards = [];
+                    }
+                    const sourceCards = sourceColumn.cards;
+                    const targetCards = sourceColumn === targetColumn ? sourceCards : targetColumn.cards;
+                    const currentIndex = sourceCards.findIndex((item) => String(item.id) === String(cardId));
+                    if (currentIndex === -1) {
+                        return false;
+                    }
+                    const [card] = sourceCards.splice(currentIndex, 1);
+                    if (!card) {
+                        return false;
+                    }
+                    card.columnId = targetColumn.id;
+                    const boundedPosition = Math.max(0, Math.min(targetCards.length, targetPosition));
+                    targetCards.splice(boundedPosition, 0, card);
+                    sourceCards.forEach((item, index) => {
+                        item.position = index;
+                    });
+                    targetCards.forEach((item, index) => {
+                        item.position = index;
+                    });
+                    return true;
+                }
+
+                function clearDragVisuals() {
+                    const draggingCard = boardCanvas.querySelector('.kanban-card.is-dragging');
+                    if (draggingCard) {
+                        draggingCard.classList.remove('is-dragging');
+                    }
+                    if (dragState.activeDropColumn) {
+                        dragState.activeDropColumn.classList.remove('is-drop-target');
+                        dragState.activeDropColumn = null;
+                    }
+                    if (dragState.activeDropList) {
+                        dragState.activeDropList.classList.remove('is-drop-target');
+                        dragState.activeDropList = null;
+                    }
+                }
+
+                function clearDragState() {
+                    clearDragVisuals();
+                    dragState.cardId = null;
+                    dragState.sourceColumnId = null;
+                    dragState.sourcePosition = null;
+                }
+
+                function collectCardPayload(form) {
+                    const labels = (form.labels.value || '')
+                        .split(',')
+                        .map((value) => value.trim())
+                        .filter(Boolean);
+
+                    const assigneeIds = Array.from(form.querySelectorAll('input[name="assigneeIds[]"]:checked'))
+                        .map((input) => Number(input.value));
+
+                    const estimateResult = parseDurationInput(form.estimatedDuration?.value ?? '');
+                    if (estimateResult.error) {
+                        throw new Error(estimateResult.error);
+                    }
+
+                    return {
+                        title: form.title.value.trim(),
+                        description: form.description.value.trim() || null,
+                        dueAt: form.dueAt.value ? new Date(form.dueAt.value).toISOString() : null,
+                        labels,
+                        assigneeIds,
+                        archived: form.archived.checked,
+                        estimatedMinutes: estimateResult.minutes,
+                    };
+                }
+
+                function fillCardForm(form, card) {
+                    form.title.value = card.title ?? '';
+                    form.description.value = card.description ?? '';
+                    form.dueAt.value = card.dueAt ? formatInputDate(card.dueAt) : '';
+                    if (form.dueAt) {
+                        updateDeadlineFieldState(form.dueAt);
+                    }
+                    form.labels.value = (card.labels ?? []).join(', ');
+                    form.archived.checked = Boolean(card.archived);
+                    form.estimatedDuration.value = card.estimatedMinutes ? formatDuration(card.estimatedMinutes) : '';
+                }
+
+                async function refreshBoard() {
+                    try {
+                        const snapshot = await fetchJson(`/api/boards/${boardId}`);
+                        updateBoard(snapshot);
+                    } catch (error) {
+                        console.warn('Nie udało się odświeżyć tablicy.', error);
+                    }
+                }
+
+                function startRealtimeUpdates(endpoint, onSnapshot) {
+                    if (!endpoint || typeof onSnapshot !== 'function') {
+                        return;
+                    }
+
+                    const MIN_DELAY_MS = 2000;
+                    const MAX_DELAY_MS = 10000;
+                    let nextDelay = MIN_DELAY_MS;
+
+                    const scheduleNext = (delay) => {
+                        window.setTimeout(() => poll(), delay);
+                    };
+
+                    const poll = async () => {
+                        let requestUrl = endpoint;
+                        if (updatesCursor !== null) {
+                            requestUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}since=${encodeURIComponent(updatesCursor)}`;
+                        }
+
+                        try {
+                            const data = await fetchJson(requestUrl);
+                            const events = Array.isArray(data?.events) ? data.events : [];
+
+                            if (typeof data?.latestId === 'number' && Number.isFinite(data.latestId) && data.latestId > 0) {
+                                updatesCursor = data.latestId;
+                            }
+
+                            if (events.length > 0) {
+                                const latestEvent = events[events.length - 1];
+                                if (latestEvent?.snapshot) {
+                                    onSnapshot(latestEvent.snapshot);
+                                }
+                            }
+
+                            const retryCandidate = Number(data?.retry);
+                            if (Number.isFinite(retryCandidate) && retryCandidate > 0) {
+                                nextDelay = Math.min(Math.max(retryCandidate, MIN_DELAY_MS), MAX_DELAY_MS);
+                            } else {
+                                nextDelay = MIN_DELAY_MS;
+                            }
+                        } catch (error) {
+                            console.warn('Nie udało się pobrać aktualizacji tablicy.', error);
+                            nextDelay = Math.min(Math.floor(nextDelay * 1.5), MAX_DELAY_MS);
+                        } finally {
+                            scheduleNext(nextDelay);
+                        }
+                    };
+
+                    poll();
+                }
+
+                function renderLabels(labels) {
+                    if (!labels || !labels.length) {
+                        return '';
+                    }
+                    return `<div class="kanban-card-labels">${labels.map((label) => `<span class="kanban-label">${escapeHtml(label)}</span>`).join('')}</div>`;
+                }
+
+                function renderAssignees(assignees) {
+                    if (!Array.isArray(assignees) || assignees.length === 0) {
+                        return '';
+                    }
+                    const items = assignees.map((assignee) => {
+                        const displayName = escapeHtml(assignee.displayName ?? '');
+                        const initials = escapeHtml(getInitials(assignee.displayName));
+                        return `<span class="kanban-assignee" title="${displayName}">${initials}</span>`;
+                    }).join('');
+                    return `<div class="kanban-card-assignees">${items}</div>`;
+                }
+            });
+        }());
+    </script>
+{% endblock %}
+
+{% block body %}
+<div class="board-hero text-white">
+    <div class="container-fluid px-4 px-lg-5 board-toolbar py-3">
+        <div class="board-toolbar-left">
+            <h1 class="board-title mb-2">{{ board.name }}</h1>
+            <div class="board-meta">
+                <span class="board-chip">Właściciel: {{ board.owner.displayName ?? board.owner.userIdentifier }}</span>
+                {% set currentUser = app.user %}
+                {% set currentMembership = null %}
+                {% for member in boardData.members %}
+                    {% if member.id == currentUser.id %}
+                        {% set currentMembership = member %}
+                    {% endif %}
+                {% endfor %}
+                {% if currentMembership %}
+                    <span class="badge role-badge role-{{ currentMembership.role }}">
+                        {% if currentMembership.role == 'owner' %}
+                            Właściciel
+                        {% elseif currentMembership.role == 'admin' %}
+                            Admin
+                        {% else %}
+                            Członek
+                        {% endif %}
+                    </span>
+                {% endif %}
+                <span class="board-chip board-chip-soft">Członkowie: <span id="member-count">{{ boardData.members|length }}</span></span>
+            </div>
+            {% if board.description %}
+                <p class="board-description mb-0">{{ board.description }}</p>
+            {% endif %}
+        </div>
+        <div class="board-toolbar-right">
+            <div class="board-actions d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ path('app_board_worklog', {slug: board.slug}) }}" class="btn btn-outline-light btn-sm">
+                    <svg class="me-1" style="width: 16px; height: 16px; display: inline-block; vertical-align: text-bottom;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Worklog
+                </a>
+                <button class="btn btn-surface btn-sm" id="add-column-button">Dodaj kolumnę</button>
+                <button class="btn btn-outline-light btn-sm" id="manage-members-button">Zarządzaj członkami</button>
+                <div class="dropdown board-members">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Lista członków
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end" id="members-dropdown">
+                        {% if boardData.members is not empty %}
+                            {% for member in boardData.members %}
+                                <span class="dropdown-item-text">{{ member.displayName }}{% if member.role != 'member' %} <small class="text-muted">({{ member.role }})</small>{% endif %}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="dropdown-item-text text-muted">Brak członków</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <button class="btn btn-danger btn-sm" id="delete-board-button">Usuń tablicę</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="board-wrapper" data-board='{{ boardDataJson|e('html_attr') }}' data-updates="{{ updatesUrl|e('html_attr') }}" data-updates-cursor="{{ (updatesCursor ?? '')|e('html_attr') }}" data-board-id="{{ board.id }}" data-board-slug="{{ board.slug }}">
+    <div class="board-canvas" id="board-canvas">
+        {% for column in boardData.columns %}
+            {% set columnStatus = column.status|default('')|lower %}
+            {% set columnTitleLower = column.title|lower %}
+            {% if columnStatus is empty %}
+                {% set isDoneTitle = false %}
+                {% if 'done' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'completed' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'complete' in columnTitleLower and 'incomplete' not in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'finish' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'finished' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'gotowe' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'zrobione' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'ukończ' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'skoncz' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'zamkn' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% elseif 'archiw' in columnTitleLower %}
+                    {% set isDoneTitle = true %}
+                {% endif %}
+                {% if isDoneTitle %}
+                    {% set columnStatus = 'done' %}
+                {% elseif loop.last %}
+                    {% set columnStatus = 'done' %}
+                {% endif %}
+            {% endif %}
+            <div class="kanban-column" data-column-id="{{ column.id }}" data-status="{{ columnStatus }}">
+                <div class="kanban-column-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <input class="form-control form-control-sm column-title-input" value="{{ column.title }}" data-column-id="{{ column.id }}">
+                        <span class="badge bg-secondary">{{ column.cards|length }}</span>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">•••</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item text-danger" data-action="delete-column" data-column-id="{{ column.id }}">Usuń kolumnę</button></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="kanban-card-list" data-column-id="{{ column.id }}">
+                    {% for card in column.cards %}
+                        {% set deadlineClass = '' %}
+                        {% if card.dueAt is not null %}
+                            {% if card.dueAt < 'now' %}
+                                {% set deadlineClass = 'deadline-overdue' %}
+                            {% elseif card.dueAt < '+1 day' %}
+                                {% set deadlineClass = 'deadline-warning' %}
+                            {% endif %}
+                        {% endif %}
+                        {% set hasEstimate = card.estimatedMinutes is not null and card.estimatedMinutes > 0 %}
+                        {% set trackedMinutes = card.trackedMinutes|default(0) %}
+                        {% set timeOverrun = hasEstimate and trackedMinutes > card.estimatedMinutes %}
+                        {% set overrunMinutes = timeOverrun ? trackedMinutes - card.estimatedMinutes : 0 %}
+                        {% set cardClasses = ['kanban-card'] %}
+                        {% if deadlineClass %}
+                            {% set cardClasses = cardClasses|merge([deadlineClass]) %}
+                        {% endif %}
+                        {% if card.archived %}
+                            {% set cardClasses = cardClasses|merge(['is-archived']) %}
+                        {% endif %}
+                        {% if columnStatus in ['done', 'completed'] %}
+                            {% set cardClasses = cardClasses|merge(['is-completed']) %}
+                        {% endif %}
+                        {% if timeOverrun %}
+                            {% set cardClasses = cardClasses|merge(['time-overrun']) %}
+                        {% endif %}
+                        <article class="{{ cardClasses|join(' ') }}" data-card-id="{{ card.id }}" data-position="{{ card.position|default(0) }}" draggable="true">
+                            <h3 class="kanban-card-title">{{ card.title }}</h3>
+                            {% if card.labels is not empty %}
+                                <div class="kanban-card-labels">
+                                    {% for label in card.labels %}
+                                        <span class="kanban-label">{{ label }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="kanban-card-meta">
+                                {% if card.archived %}
+                                    <span class="badge badge-archived">Zarchiwizowana</span>
+                                {% endif %}
+                                {% if card.dueAt %}
+                                    {% set dueLabel = card.dueAt|date('d.m.Y H:i') %}
+                                    {% if deadlineClass == 'deadline-overdue' %}
+                                        <span class="badge badge-deadline-overdue">Po terminie: {{ dueLabel }}</span>
+                                    {% elseif deadlineClass == 'deadline-warning' %}
+                                        <span class="badge badge-deadline-warning">Deadline blisko: {{ dueLabel }}</span>
+                                    {% else %}
+                                        <span class="badge badge-deadline">Deadline: {{ dueLabel }}</span>
+                                    {% endif %}
+                                {% endif %}
+                                {% if hasEstimate %}
+                                    <span class="badge text-bg-secondary">Szacunek: {{ (card.estimatedMinutes / 60)|number_format(1, ',', ' ') }} h</span>
+                                {% endif %}
+                                {% if card.commentCount > 0 %}
+                                    <span class="badge text-bg-secondary">Komentarze: {{ card.commentCount }}</span>
+                                {% endif %}
+                                {% if trackedMinutes > 0 %}
+                                    <span class="badge {{ timeOverrun ? 'badge-overrun' : 'text-bg-secondary' }}">Czas: {{ (trackedMinutes / 60)|number_format(1, ',', ' ') }} h{% if timeOverrun %} (+{{ (overrunMinutes / 60)|number_format(1, ',', ' ') }} h){% endif %}</span>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+                <button class="btn btn-link w-100 text-start text-decoration-none add-card-button" data-column-id="{{ column.id }}">+ Dodaj kartę</button>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% include 'board/partials/column_modal.html.twig' %}
+{% include 'board/partials/card_modal.html.twig' %}
+{% include 'board/partials/comment_modal.html.twig' %}
+{% include 'board/partials/member_modal.html.twig' %}
+{% endblock %}

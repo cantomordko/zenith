@@ -1,0 +1,570 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Worklog · {{ board.name }} · Zenith{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .worklog-shell {
+            color: #e2e8f0;
+            max-width: 1200px;
+        }
+
+        .worklog-header {
+            background: rgba(24, 32, 50, 0.78);
+            border: 1px solid rgba(99, 112, 140, 0.32);
+            border-radius: 18px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 45px rgba(4, 9, 18, 0.5);
+        }
+
+        .worklog-header .btn-outline-secondary {
+            border-color: rgba(148, 163, 184, 0.45);
+            color: #e2e8f0;
+        }
+
+        .worklog-header .btn-outline-secondary:hover {
+            background: rgba(148, 163, 184, 0.2);
+            border-color: rgba(191, 210, 235, 0.45);
+        }
+
+        .worklog-shell h1,
+        .worklog-shell .section-title {
+            color: #f8fafc;
+        }
+
+        .worklog-shell .text-muted {
+            color: rgba(203, 213, 225, 0.68) !important;
+        }
+
+        .worklog-shell .text-muted.small,
+        .worklog-shell .text-muted .small {
+            color: rgba(203, 213, 225, 0.6) !important;
+        }
+
+        .worklog-card {
+            background: rgba(19, 26, 43, 0.95);
+            border: 1px solid rgba(99, 112, 140, 0.32);
+            border-radius: 18px;
+            box-shadow: 0 28px 60px rgba(4, 9, 18, 0.55);
+            color: #e2e8f0;
+        }
+
+        .badge-overrun {
+            background: rgba(249, 115, 22, 0.2);
+            border: 1px solid rgba(249, 115, 22, 0.45);
+            color: #fb923c;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline {
+            background: rgba(138, 180, 255, 0.2);
+            border: 1px solid rgba(138, 180, 255, 0.45);
+            color: #dbeafe;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline-warning {
+            background: rgba(251, 191, 36, 0.22);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            color: #facc15;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-deadline-overdue {
+            background: rgba(248, 113, 113, 0.22);
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            color: #fecaca;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .worklog-card .card-header {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(17, 24, 39, 0.88));
+            border-bottom: 1px solid rgba(99, 112, 140, 0.35);
+            color: #f8fafc;
+        }
+
+        .worklog-card .card-body {
+            color: inherit;
+        }
+
+        .worklog-card .list-group-item {
+            background: rgba(24, 32, 50, 0.88);
+            border-color: rgba(99, 112, 140, 0.28);
+            color: #e2e8f0;
+        }
+
+        .worklog-card .list-group-item + .list-group-item {
+            border-top: 1px solid rgba(99, 112, 140, 0.32);
+        }
+
+        .worklog-card .list-group-item.is-overrun {
+            background: rgba(54, 33, 20, 0.75);
+            border-color: rgba(249, 115, 22, 0.4);
+            box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.2);
+        }
+
+        .worklog-card .list-group-item.is-overrun strong {
+            color: #fed7aa;
+        }
+
+        .worklog-card .list-group-item.is-overrun .progress-bar {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(253, 186, 116, 0.75));
+        }
+
+        .worklog-card .list-group-item.deadline-warning {
+            box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.25);
+            background: rgba(80, 56, 20, 0.6);
+            border-color: rgba(251, 191, 36, 0.35);
+        }
+
+        .worklog-card .list-group-item.deadline-overdue {
+            box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.25);
+            background: rgba(90, 32, 28, 0.6);
+            border-color: rgba(248, 113, 113, 0.4);
+        }
+
+        .worklog-card.table-card {
+            overflow: hidden;
+        }
+
+        .worklog-shell .metric-icon {
+            background: rgba(71, 85, 105, 0.3);
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            box-shadow: 0 12px 24px rgba(3, 7, 18, 0.35);
+        }
+
+        .worklog-shell .metric-icon.bg-primary {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(56, 189, 248, 0.75));
+        }
+
+        .worklog-shell .metric-icon.bg-success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.85), rgba(34, 197, 94, 0.7));
+        }
+
+        .worklog-shell .metric-icon.bg-info {
+            background: linear-gradient(135deg, rgba(30, 128, 224, 0.85), rgba(147, 197, 253, 0.6));
+        }
+
+        .worklog-shell .progress {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 999px;
+        }
+
+        .worklog-shell .progress-bar {
+            border-radius: 999px;
+        }
+
+        .worklog-card .progress-bar.overrun {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(253, 186, 116, 0.75));
+        }
+
+        .worklog-shell .badge.bg-secondary {
+            background: rgba(148, 163, 184, 0.18);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            color: #e2e8f0;
+        }
+
+        .worklog-shell .badge.bg-primary {
+            background: rgba(129, 140, 248, 0.3);
+            border: 1px solid rgba(129, 140, 248, 0.5);
+            color: #f8fafc;
+        }
+
+        .worklog-shell .badge.bg-success {
+            background: rgba(34, 197, 94, 0.25);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #bbf7d0;
+        }
+
+        .worklog-shell .badge.text-bg-secondary {
+            background: rgba(148, 163, 184, 0.18);
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            color: #e2e8f0;
+        }
+
+        .worklog-table {
+            color: #e2e8f0;
+        }
+
+        .worklog-table-head {
+            background: rgba(30, 41, 59, 0.92);
+            color: #f1f5f9;
+        }
+
+        .worklog-table-head th {
+            background-color: rgba(30, 41, 59, 0.95) !important;
+            color: #f8fafc;
+            border-color: rgba(71, 85, 105, 0.32) !important;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .worklog-table-head th:first-child {
+            border-top-left-radius: 12px;
+        }
+
+        .worklog-table-head th:last-child {
+            border-top-right-radius: 12px;
+        }
+
+        .worklog-table tbody tr {
+            background-color: rgba(17, 24, 39, 0.92);
+            border-color: rgba(71, 85, 105, 0.32);
+        }
+
+        .worklog-table tbody tr:hover {
+            background-color: rgba(59, 73, 102, 0.55);
+        }
+
+        .worklog-table tbody tr.is-overrun {
+            background-color: rgba(54, 33, 20, 0.78);
+            border-color: rgba(249, 115, 22, 0.4);
+        }
+
+        .worklog-table tbody tr.is-overrun:hover {
+            background-color: rgba(63, 39, 24, 0.82);
+        }
+
+        .worklog-table tbody tr.deadline-warning {
+            background-color: rgba(80, 56, 20, 0.65);
+            border-color: rgba(251, 191, 36, 0.4);
+        }
+
+        .worklog-table tbody tr.deadline-warning:hover {
+            background-color: rgba(101, 71, 29, 0.75);
+        }
+
+        .worklog-table tbody tr.deadline-overdue {
+            background-color: rgba(90, 32, 28, 0.68);
+            border-color: rgba(248, 113, 113, 0.45);
+        }
+
+        .worklog-table tbody tr.deadline-overdue:hover {
+            background-color: rgba(112, 40, 35, 0.78);
+        }
+
+        .worklog-table tbody td,
+        .worklog-table tbody th {
+            background-color: inherit !important;
+            border-color: rgba(71, 85, 105, 0.32);
+        }
+
+        .worklog-table tbody td .text-muted,
+        .worklog-table tbody th .text-muted {
+            color: rgba(203, 213, 225, 0.65) !important;
+        }
+
+        .worklog-table tbody td {
+            color: #e2e8f0;
+        }
+
+        .worklog-table tbody td.time-overrun-cell {
+            color: #fcd34d;
+        }
+
+        .worklog-table tbody td .badge {
+            box-shadow: 0 8px 20px rgba(2, 8, 20, 0.4);
+        }
+
+        .worklog-table td,
+        .worklog-table th {
+            border-color: rgba(71, 85, 105, 0.32);
+        }
+
+        .worklog-card.table-card .table-responsive {
+            background: rgba(17, 24, 39, 0.92);
+        }
+
+        .worklog-shell .table-responsive .table {
+            margin-bottom: 0;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="container py-5 worklog-shell">
+    <div class="worklog-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="text-muted text-uppercase small mb-1">Zestawienie czasu</div>
+            <h1 class="h3 mb-1">Worklog: {{ board.name }}</h1>
+            <p class="mb-0 text-muted">Podgląd czasu przepracowanego we wszystkich kartach tej tablicy.</p>
+        </div>
+        <a href="{{ path('app_board_show', { slug: board.slug }) }}" class="btn btn-outline-secondary d-inline-flex align-items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" class="me-2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Powrót do tablicy
+        </a>
+    </div>
+
+    <div class="card worklog-card shadow-sm mb-4">
+        <div class="card-header">
+            <strong>Filtry</strong>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label for="date_from" class="form-label">Data od</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ dateFrom }}" class="form-control">
+                </div>
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label for="date_to" class="form-label">Data do</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ dateTo }}" class="form-control">
+                </div>
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label for="user_id" class="form-label">Użytkownik</label>
+                    <select id="user_id" name="user_id" class="form-select">
+                        <option value="">Wszyscy</option>
+                        {% for member in boardMembers %}
+                            <option value="{{ member.id }}" {% if selectedUserId is not null and selectedUserId == member.id %}selected{% endif %}>
+                                {{ member.displayName }} · {{ member.email }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-lg-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">Filtruj</button>
+                    {% if dateFrom or dateTo or selectedUserId is not null %}
+                        <a href="{{ path('app_board_worklog', { slug: board.slug }) }}" class="btn btn-outline-secondary">Wyczyść</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card worklog-card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="metric-icon rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase small mb-1">Łączny czas</div>
+                            <div class="h4 mb-0">{{ (totalMinutes / 60)|number_format(1, ',', ' ') }} h</div>
+                            <div class="text-muted small">{{ totalMinutes }} min</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card worklog-card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="metric-icon rounded-circle bg-success text-white d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase small mb-1">Liczba wpisów</div>
+                            <div class="h4 mb-0">{{ timeEntries|length }}</div>
+                            <div class="text-muted small">W tym zakresie</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card worklog-card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="metric-icon rounded-circle bg-info text-white d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-muted text-uppercase small mb-1">Aktywne osoby</div>
+                            <div class="h4 mb-0">{{ entriesByUser|length }}</div>
+                            <div class="text-muted small">Z wpisami czasu</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-6">
+            <div class="card worklog-card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Według użytkowników</span>
+                    <span class="badge bg-secondary">{{ entriesByUser|length }}</span>
+                </div>
+                {% if entriesByUser is empty %}
+                    <div class="card-body text-center text-muted py-5">
+                        Brak wpisów czasu dla wybranych filtrów.
+                    </div>
+                {% else %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in entriesByUser %}
+                            {% set progressWidth = totalMinutes > 0 ? (item.minutes * 100 / totalMinutes) : 0 %}
+                            <li class="list-group-item">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ item.user.displayName }}</strong>
+                                        <div class="text-muted small">{{ item.user.email }}</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="fw-semibold">{{ (item.minutes / 60)|number_format(1, ',', ' ') }} h</span>
+                                        <div class="text-muted small">{{ item.entries|length }} wpis{{ item.entries|length == 1 ? '' : (item.entries|length < 5 ? 'y' : 'ów') }}</div>
+                                    </div>
+                                </div>
+                                <div class="progress mt-3" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ progressWidth|round(0, 'floor') }}%;" aria-valuenow="{{ progressWidth|round(0, 'floor') }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card worklog-card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Według kart</span>
+                    <span class="badge bg-secondary">{{ entriesByCard|length }}</span>
+                </div>
+                {% if entriesByCard is empty %}
+                    <div class="card-body text-center text-muted py-5">
+                        Brak wpisów czasu dla wybranych filtrów.
+                    </div>
+                {% else %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in entriesByCard %}
+                            {% set progressWidth = totalMinutes > 0 ? (item.minutes * 100 / totalMinutes) : 0 %}
+                            {% set estimate = item.estimatedMinutes ?? null %}
+                            {% set hasEstimate = estimate is not null and estimate > 0 %}
+                            {% set trackedTotal = item.trackedTotal ?? item.minutes %}
+                            {% set overrun = item.overrun ?? false %}
+                            {% set overrunMinutes = item.overrunMinutes ?? 0 %}
+                            {% set deadlineStatus = item.deadlineStatus ?? null %}
+                            {% set deadlineClass = (deadlineStatus in ['warning', 'overdue']) ? 'deadline-' ~ deadlineStatus : '' %}
+                            {% set dueAt = item.dueAt ?? null %}
+                            <li class="list-group-item {{ overrun ? 'is-overrun' : '' }} {{ deadlineClass }}">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ item.card.title }}</strong>
+                                        <div class="text-muted small">Kolumna: {{ item.card.column.title }}</div>
+                                        {% if hasEstimate %}
+                                            <div class="text-muted small mt-1">Szacunek: {{ (estimate / 60)|number_format(1, ',', ' ') }} h · Łącznie: {{ (trackedTotal / 60)|number_format(1, ',', ' ') }} h{% if overrun %} (+{{ (overrunMinutes / 60)|number_format(1, ',', ' ') }} h łącznie){% endif %}</div>
+                                        {% endif %}
+                                        {% if dueAt %}
+                                            <div class="mt-2">
+                                                {% if deadlineStatus == 'overdue' %}
+                                                    <span class="badge badge-deadline-overdue">Po terminie: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                                {% elseif deadlineStatus == 'warning' %}
+                                                    <span class="badge badge-deadline-warning">Deadline blisko: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                                {% else %}
+                                                    <span class="badge badge-deadline">Deadline: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end">
+                                        {% if overrun %}
+                                            <div><span class="badge badge-overrun mb-1">Przekroczono szacunek</span></div>
+                                        {% endif %}
+                                        <span class="fw-semibold {{ overrun ? 'text-warning' : 'text-success' }}">{{ (item.minutes / 60)|number_format(1, ',', ' ') }} h</span>
+                                        <div class="text-muted small">{{ item.entries|length }} wpis{{ item.entries|length == 1 ? '' : (item.entries|length < 5 ? 'y' : 'ów') }}</div>
+                                    </div>
+                                </div>
+                                <div class="progress mt-3" style="height: 6px;">
+                                    <div class="progress-bar {{ overrun ? 'overrun' : 'bg-success' }}" role="progressbar" style="width: {{ progressWidth|round(0, 'floor') }}%;" aria-valuenow="{{ progressWidth|round(0, 'floor') }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card worklog-card shadow-sm table-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Wszystkie wpisy</span>
+            <span class="badge bg-secondary">{{ timeEntries|length }}</span>
+        </div>
+        {% if timeEntries is empty %}
+            <div class="card-body text-center text-muted py-5">
+                {% if dateFrom or dateTo or selectedUserId is not null %}
+                    Brak wpisów czasu spełniających kryteria filtrów.
+                {% else %}
+                    Żadne wpisy czasu nie zostały jeszcze utworzone na tej tablicy.
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 worklog-table">
+                    <thead class="worklog-table-head">
+                        <tr>
+                            <th scope="col">Data</th>
+                            <th scope="col">Karta</th>
+                            <th scope="col">Użytkownik</th>
+                            <th scope="col">Czas</th>
+                            <th scope="col">Notatka</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in timeEntries %}
+                            {% set cardInfo = cardOverruns[entry.card.id] ?? null %}
+                            {% set overrun = cardInfo is not null and (cardInfo.overrun ?? false) %}
+                            {% set estimate = cardInfo.estimatedMinutes ?? null %}
+                            {% set overrunMinutes = cardInfo.overrunMinutes ?? 0 %}
+                            {% set deadlineStatus = cardInfo.deadlineStatus ?? null %}
+                            {% set dueAt = cardInfo.dueAt ?? null %}
+                            {% set rowClasses = [] %}
+                            {% if overrun %}
+                                {% set rowClasses = rowClasses|merge(['is-overrun']) %}
+                            {% endif %}
+                            {% if deadlineStatus in ['warning', 'overdue'] %}
+                                {% set rowClasses = rowClasses|merge(['deadline-' ~ deadlineStatus]) %}
+                            {% endif %}
+                            <tr class="{{ rowClasses|join(' ') }}">
+                                <td class="text-nowrap">{{ entry.loggedAt|date('d.m.Y H:i') }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ entry.card.title }}</div>
+                                    <div class="text-muted small">Kolumna: {{ entry.card.column.title }}</div>
+                                    {% if overrun and estimate %}
+                                        <div class="text-muted small mt-1">Szacunek: {{ (estimate / 60)|number_format(1, ',', ' ') }} h</div>
+                                    {% endif %}
+                                    {% if dueAt %}
+                                        <div class="mt-1">
+                                            {% if deadlineStatus == 'overdue' %}
+                                                <span class="badge badge-deadline-overdue">Po terminie: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                            {% elseif deadlineStatus == 'warning' %}
+                                                <span class="badge badge-deadline-warning">Deadline blisko: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                            {% else %}
+                                                <span class="badge badge-deadline">Deadline: {{ dueAt|date('d.m.Y H:i') }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">{{ entry.author.displayName }}</div>
+                                    <div class="text-muted small">{{ entry.author.email }}</div>
+                                </td>
+                                <td class="text-nowrap {{ overrun ? 'time-overrun-cell' : '' }}">
+                                    <span class="badge {{ overrun ? 'badge-overrun' : 'bg-primary text-white' }}">{{ (entry.minutesSpent / 60)|number_format(1, ',', ' ') }} h{% if overrun %} (+{{ (overrunMinutes / 60)|number_format(1, ',', ' ') }} h łącznie){% endif %}</span>
+                                    <div class="text-muted small">{{ entry.minutesSpent }} min{% if overrun and estimate %} · szacunek {{ (estimate / 60)|number_format(1, ',', ' ') }} h{% endif %}</div>
+                                </td>
+                                <td class="text-muted">{{ entry.note|default('—') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Logowanie{% endblock %}
+
+{% block body %}
+<div class="container auth-container py-5">
+    <div class="row justify-content-center flex-grow-1">
+        <div class="col-md-5 col-lg-4">
+            <div class="auth-card p-4">
+                <div class="mb-4 text-center">
+                    <h1 class="h4 mb-2">Zenith · Logowanie</h1>
+                    <p class="mb-0 page-header-muted">Zacznij pracę na swoich tablicach</p>
+                </div>
+
+                {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ error.messageKey|trans(error.messageData, 'security') }}
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="inputEmail" class="form-label">Adres e-mail</label>
+                        <input type="email" value="{{ last_username }}" name="email" id="inputEmail" class="form-control" autocomplete="email" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="inputPassword" class="form-label">Hasło</label>
+                        <input type="password" name="password" id="inputPassword" class="form-control" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="_remember_me" id="rememberMe" class="form-check-input" checked>
+                        <label class="form-check-label" for="rememberMe">Zapamiętaj mnie</label>
+                    </div>
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                    <button class="btn btn-primary w-100" type="submit">Zaloguj się</button>
+                </form>
+
+                <p class="text-center small mt-4 mb-0">
+                    Nie masz konta? <a href="{{ path('app_register') }}">Załóż je w kilka sekund</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

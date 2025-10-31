@@ -1,0 +1,232 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Tablice · Zenith{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .card-hover {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0.75rem 2rem rgba(27, 79, 114, 0.15);
+        }
+
+        .board-index-shell {
+            max-width: 1200px;
+        }
+
+        .board-index-shell h1 {
+            color: #f8fafc;
+        }
+
+        .board-index-shell p {
+            color: rgba(203, 213, 225, 0.78);
+        }
+
+        .board-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(27, 36, 57, 0.95), rgba(14, 21, 38, 0.98));
+            border: 1px solid rgba(99, 112, 140, 0.28);
+            border-radius: 18px;
+            box-shadow: 0 24px 48px rgba(3, 8, 18, 0.5);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .board-card:hover {
+            color: #f8fafc;
+        }
+
+        .board-card::after {
+            content: '';
+            position: absolute;
+            inset: -40% -20% auto;
+            height: 80%;
+            background: radial-gradient(circle, rgba(138, 180, 255, 0.15), transparent 55%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .board-card:hover::after {
+            opacity: 1;
+        }
+
+        .board-card h2 {
+            color: #f8fafc;
+        }
+
+        .board-card p {
+            color: rgba(226, 232, 240, 0.74);
+        }
+
+        .board-card span {
+            color: #8ab4ff;
+        }
+
+        .board-card span:hover {
+            color: #c6dcff;
+        }
+
+        .board-card .board-card__footer {
+            margin-top: 1.25rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #93c5fd;
+        }
+
+        .board-card .board-card__footer svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .empty-state-panel {
+            background: rgba(17, 24, 39, 0.92);
+            border: 1px solid rgba(99, 112, 140, 0.3);
+            border-radius: 18px;
+            padding: 2rem;
+            box-shadow: 0 30px 50px rgba(4, 8, 18, 0.55);
+            color: rgba(226, 232, 240, 0.88);
+        }
+
+        .empty-state-panel strong {
+            color: #f8fafc;
+        }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        (function () {
+            const api = window.Zenith;
+            if (!api?.registerInit || !api?.utils) {
+                return;
+            }
+            const { fetchJson, toggleLoading, showError, hideError } = api.utils;
+
+            api.registerInit(() => {
+                const form = document.querySelector('#create-board-form');
+                if (!form) {
+                    return;
+                }
+
+                const modalEl = document.getElementById('createBoardModal');
+                const modal = modalEl && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+                const submitButton = form.querySelector('button[type="submit"]');
+                const spinner = submitButton?.querySelector('.spinner-border');
+                const errorBox = document.getElementById('board-error');
+
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    hideError(errorBox);
+                    toggleLoading(submitButton, spinner, true);
+
+                    const payload = {
+                        name: form.name.value.trim(),
+                        description: form.description.value.trim() || null,
+                    };
+
+                    try {
+                        const response = await fetchJson('/api/boards', {
+                            method: 'POST',
+                            body: JSON.stringify(payload),
+                        });
+
+                        if (modal) {
+                            modal.hide();
+                        }
+                        form.reset();
+                        if (response?.slug) {
+                            window.location.href = `/boards/${response.slug}`;
+                        } else {
+                            window.location.reload();
+                        }
+                    } catch (error) {
+                        showError(errorBox, error.message ?? 'Nie udało się utworzyć tablicy.');
+                    } finally {
+                        toggleLoading(submitButton, spinner, false);
+                    }
+                });
+            });
+        }());
+    </script>
+{% endblock %}
+
+{% block body %}
+<div class="container board-index-shell py-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Twoje tablice</h1>
+            <p class="mb-0 page-header-muted">Zarządzaj pracą swojego zespołu w jednym miejscu.</p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBoardModal">
+            Nowa tablica
+        </button>
+    </div>
+
+    <div class="row g-4" id="board-list">
+        {% for board in boards %}
+            <div class="col-12 col-md-6 col-lg-3">
+                <a class="board-card card-hover h-100" href="{{ path('app_board_show', { slug: board.slug }) }}">
+                    <h2 class="h5 mb-2">{{ board.name }}</h2>
+                    <p class="flex-grow-1 mb-2">{{ board.description|default('Tablica Kanban') }}</p>
+                    <span class="board-card__footer">Otwórz tablicę
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5.5 3.5L10.5 8L5.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                </a>
+            </div>
+        {% else %}
+            <div class="col-12">
+                <div class="empty-state-panel text-center">
+                    <strong>Brak tablic</strong>
+                    <p class="mb-0 mt-2">Nie masz jeszcze żadnej tablicy. Utwórz pierwszą, aby rozpocząć planowanie pracy.</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="createBoardModal" tabindex="-1" aria-labelledby="createBoardModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="create-board-form">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="createBoardModalLabel">Nowa tablica</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="board-name">Nazwa</label>
+                        <input type="text" class="form-control" name="name" id="board-name" placeholder="Nazwa tablicy" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="board-description">Opis (opcjonalnie)</label>
+                        <textarea class="form-control" name="description" id="board-description" rows="3" placeholder="Krótki opis celu tablicy"></textarea>
+                    </div>
+                    <div class="alert alert-danger d-none" id="board-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        Utwórz
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

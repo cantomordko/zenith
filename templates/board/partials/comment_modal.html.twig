@@ -1,0 +1,21 @@
+<div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="comment-form">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-6" id="commentModalLabel">Edycja komentarza</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="comment-id">
+                    <textarea class="form-control" id="comment-edit-content" rows="4" required></textarea>
+                    <div class="alert alert-danger d-none mt-3" id="comment-edit-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zamknij</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

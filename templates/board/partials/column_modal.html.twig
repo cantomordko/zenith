@@ -1,0 +1,27 @@
+<div class="modal fade" id="columnModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="column-form">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="columnModalLabel">Nowa kolumna</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="columnId" id="column-id">
+                    <div class="mb-3">
+                        <label for="column-title" class="form-label">Nazwa kolumny</label>
+                        <input type="text" class="form-control" id="column-title" name="title" required>
+                    </div>
+                    <div class="alert alert-danger d-none" id="column-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        Zapisz
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
