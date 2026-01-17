@@ -33,9 +33,12 @@ class BoardController extends AbstractController
         /** @var \App\Entity\User $user */
         $user = $this->getUser();
         $boards = $this->boardRepository->findByMember($user);
+        $updatesCursor = $this->updateStore->getLatestUserSequence($user->getId());
 
         return $this->render('board/index.html.twig', [
             'boards' => $boards,
+            'updatesUrl' => $this->generateUrl('api_user_updates'),
+            'updatesCursor' => $updatesCursor,
         ]);
     }
 

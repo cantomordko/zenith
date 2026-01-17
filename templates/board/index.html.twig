@@ -113,9 +113,115 @@
             if (!api?.registerInit || !api?.utils) {
                 return;
             }
-            const { fetchJson, toggleLoading, showError, hideError } = api.utils;
+            const { fetchJson, toggleLoading, showError, hideError, escapeHtml } = api.utils;
 
             api.registerInit(() => {
+                const boardShell = document.querySelector('.board-index-shell');
+                const boardList = document.getElementById('board-list');
+                const updatesUrl = boardShell?.dataset?.updates;
+                const updatesCursorRaw = boardShell?.dataset?.updatesCursor ?? '';
+                let updatesCursor = Number.parseInt(updatesCursorRaw, 10);
+                if (!Number.isFinite(updatesCursor) || updatesCursor <= 0) {
+                    updatesCursor = null;
+                }
+
+                const renderBoards = (boards) => {
+                    if (!boardList) {
+                        return;
+                    }
+                    if (!Array.isArray(boards) || boards.length === 0) {
+                        boardList.innerHTML = `
+                            <div class="col-12">
+                                <div class="empty-state-panel text-center">
+                                    <strong>Brak tablic</strong>
+                                    <p class="mb-0 mt-2">Nie masz jeszcze żadnej tablicy. Utwórz pierwszą, aby rozpocząć planowanie pracy.</p>
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    const html = boards.map((board) => {
+                        const description = board.description ? escapeHtml(board.description) : 'Tablica Kanban';
+                        const name = escapeHtml(board.name ?? '');
+                        const slug = encodeURIComponent(board.slug ?? '');
+                        return `
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <a class="board-card card-hover h-100" href="/boards/${slug}">
+                                    <h2 class="h5 mb-2">${name}</h2>
+                                    <p class="flex-grow-1 mb-2">${description}</p>
+                                    <span class="board-card__footer">Otwórz tablicę
+                                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M5.5 3.5L10.5 8L5.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </span>
+                                </a>
+                            </div>
+                        `;
+                    }).join('');
+
+                    boardList.innerHTML = html;
+                };
+
+                const refreshBoards = async () => {
+                    try {
+                        const boards = await fetchJson('/api/boards');
+                        renderBoards(boards);
+                    } catch (error) {
+                        console.warn('Nie udało się odświeżyć listy tablic.', error);
+                    }
+                };
+
+                const startRealtimeUpdates = (endpoint) => {
+                    if (!endpoint) {
+                        return;
+                    }
+
+                    const MIN_DELAY_MS = 2000;
+                    const MAX_DELAY_MS = 10000;
+                    let nextDelay = MIN_DELAY_MS;
+
+                    const scheduleNext = (delay) => {
+                        window.setTimeout(() => poll(), delay);
+                    };
+
+                    const poll = async () => {
+                        let requestUrl = endpoint;
+                        if (updatesCursor !== null) {
+                            requestUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}since=${encodeURIComponent(updatesCursor)}`;
+                        }
+
+                        try {
+                            const data = await fetchJson(requestUrl);
+                            const events = Array.isArray(data?.events) ? data.events : [];
+
+                            if (typeof data?.latestId === 'number' && Number.isFinite(data.latestId) && data.latestId > 0) {
+                                updatesCursor = data.latestId;
+                            }
+
+                            if (events.length > 0) {
+                                await refreshBoards();
+                            }
+
+                            const retryCandidate = Number(data?.retry);
+                            if (Number.isFinite(retryCandidate) && retryCandidate > 0) {
+                                nextDelay = Math.min(Math.max(retryCandidate, MIN_DELAY_MS), MAX_DELAY_MS);
+                            } else {
+                                nextDelay = MIN_DELAY_MS;
+                            }
+                        } catch (error) {
+                            console.warn('Nie udało się pobrać aktualizacji listy tablic.', error);
+                            nextDelay = Math.min(Math.floor(nextDelay * 1.5), MAX_DELAY_MS);
+                        } finally {
+                            scheduleNext(nextDelay);
+                        }
+                    };
+
+                    poll();
+                };
+
+                startRealtimeUpdates(updatesUrl);
+
                 const form = document.querySelector('#create-board-form');
                 if (!form) {
                     return;
@@ -150,7 +256,7 @@
                         if (response?.slug) {
                             window.location.href = `/boards/${response.slug}`;
                         } else {
-                            window.location.reload();
+                            await refreshBoards();
                         }
                     } catch (error) {
                         showError(errorBox, error.message ?? 'Nie udało się utworzyć tablicy.');
@@ -164,7 +270,7 @@
 {% endblock %}
 
 {% block body %}
-<div class="container board-index-shell py-5">
+<div class="container board-index-shell py-5" data-updates="{{ updatesUrl|e('html_attr') }}" data-updates-cursor="{{ (updatesCursor ?? '')|e('html_attr') }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">Twoje tablice</h1>

@@ -57,6 +57,22 @@ class BoardApiController extends AbstractController
     ) {
     }
 
+    #[Route('/boards', name: 'api_board_list', methods: ['GET'])]
+    public function listBoards(): JsonResponse
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $boards = $this->boardRepository->findByMember($user);
+        $payload = array_map(
+            fn (Board $board) => $this->boardSerializer->serializeBoardSummary($board),
+            $boards
+        );
+
+        return $this->json($payload);
+    }
+
     #[Route('/boards', name: 'api_board_create', methods: ['POST'])]
     public function createBoard(Request $request): JsonResponse
     {
@@ -93,6 +109,14 @@ class BoardApiController extends AbstractController
             'board' => $this->boardSerializer->serializeBoard($board),
         ]);
 
+        $this->updateStore->recordUserEvent($user, [
+            'event' => 'board.list.changed',
+            'payload' => [
+                'boardId' => $board->getId(),
+                'action' => 'created',
+            ],
+        ]);
+
         return $this->json($this->boardSerializer->serializeBoard($board), Response::HTTP_CREATED);
     }
 
@@ -125,6 +149,27 @@ class BoardApiController extends AbstractController
         }
 
         $updates = $this->updateStore->fetchUpdates($board->getId(), $sinceId);
+
+        return $this->json($updates);
+    }
+
+    #[Route('/users/me/updates', name: 'api_user_updates', methods: ['GET'])]
+    public function getUserUpdates(Request $request): JsonResponse
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $sinceParam = $request->query->get('since');
+        $sinceId = null;
+        if ($sinceParam !== null && $sinceParam !== '') {
+            if (!ctype_digit((string) $sinceParam)) {
+                return $this->json(['error' => 'Parametr since musi być liczbą całkowitą.'], Response::HTTP_BAD_REQUEST);
+            }
+            $sinceId = (int) $sinceParam;
+        }
+
+        $updates = $this->updateStore->fetchUserUpdates($user->getId(), $sinceId);
 
         return $this->json($updates);
     }
@@ -253,6 +298,14 @@ class BoardApiController extends AbstractController
             'member' => $memberPayload,
         ]);
 
+        $this->updateStore->recordUserEvent($targetUser, [
+            'event' => 'board.list.changed',
+            'payload' => [
+                'boardId' => $board->getId(),
+                'action' => 'member.added',
+            ],
+        ]);
+
         return $this->json($memberPayload, Response::HTTP_CREATED);
     }
 
@@ -287,6 +340,14 @@ class BoardApiController extends AbstractController
             'memberId' => $targetUser->getId(),
         ]);
 
+        $this->updateStore->recordUserEvent($targetUser, [
+            'event' => 'board.list.changed',
+            'payload' => [
+                'boardId' => $board->getId(),
+                'action' => 'member.removed',
+            ],
+        ]);
+
         return $this->json(['status' => 'ok']);
     }
 
@@ -299,8 +360,23 @@ class BoardApiController extends AbstractController
         $this->boardAccess->assertCanManage($board, $actor);
 
         $boardId = $board->getId();
+        $members = $board->getMemberships()->toArray();
         $this->em->remove($board);
         $this->em->flush();
+
+        foreach ($members as $membership) {
+            $member = $membership->getUser();
+            if (!$member) {
+                continue;
+            }
+            $this->updateStore->recordUserEvent($member, [
+                'event' => 'board.list.changed',
+                'payload' => [
+                    'boardId' => $boardId,
+                    'action' => 'deleted',
+                ],
+            ]);
+        }
 
         return $this->json(['status' => 'ok', 'boardId' => $boardId], Response::HTTP_OK);
     }

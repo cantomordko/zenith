@@ -1813,10 +1813,11 @@
                             }
 
                             if (events.length > 0) {
-                                const latestEvent = events[events.length - 1];
-                                if (latestEvent?.snapshot) {
-                                    onSnapshot(latestEvent.snapshot);
+                                const latestWithSnapshot = events.slice().reverse().find((event) => event && event.snapshot);
+                                if (latestWithSnapshot?.snapshot) {
+                                    onSnapshot(latestWithSnapshot.snapshot);
                                 }
+                                await refreshBoard();
                             }
 
                             const retryCandidate = Number(data?.retry);

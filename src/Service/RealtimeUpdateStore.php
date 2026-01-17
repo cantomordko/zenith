@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Board;
+use App\Entity\User;
 use DateTimeImmutable;
 use Predis\Client;
 use Predis\ClientInterface;
@@ -56,6 +57,37 @@ class RealtimeUpdateStore
         } catch (\Throwable $exception) {
             $this->logger->error('Failed to record board update in Redis.', [
                 'boardId' => $board->getId(),
+                'event' => $payload['event'] ?? 'unknown',
+                'exception' => $exception,
+            ]);
+        }
+    }
+
+    public function recordUserEvent(User $user, array $payload): void
+    {
+        $client = $this->getClient();
+        if ($client === null) {
+            return;
+        }
+
+        try {
+            $userId = $user->getId();
+            $sequenceKey = $this->userSequenceKey($userId);
+            $eventId = (int) $client->incr($sequenceKey);
+
+            $envelope = $payload;
+            $envelope['id'] = $eventId;
+            $envelope['createdAt'] = (new DateTimeImmutable())->format(DATE_ATOM);
+
+            $encoded = json_encode($envelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            $eventsKey = $this->userEventsKey($userId);
+
+            $client->rpush($eventsKey, [$encoded]);
+            $client->ltrim($eventsKey, -self::LIST_MAX_LENGTH, -1);
+            $client->expire($eventsKey, self::LIST_TTL_SECONDS);
+        } catch (\Throwable $exception) {
+            $this->logger->error('Failed to record user update in Redis.', [
+                'userId' => $user->getId(),
                 'event' => $payload['event'] ?? 'unknown',
                 'exception' => $exception,
             ]);
@@ -123,6 +155,67 @@ class RealtimeUpdateStore
         }
     }
 
+    public function fetchUserUpdates(int $userId, ?int $sinceId = null): array
+    {
+        $client = $this->getClient();
+        if ($client === null) {
+            return [
+                'events' => [],
+                'latestId' => $sinceId,
+                'retry' => self::DEFAULT_RETRY_MS,
+            ];
+        }
+
+        try {
+            $eventsKey = $this->userEventsKey($userId);
+            $range = $sinceId === null ? $client->lrange($eventsKey, -1, -1) : $client->lrange($eventsKey, 0, -1);
+
+            $events = [];
+            $latestId = $sinceId ?? 0;
+
+            foreach ($range as $encoded) {
+                $decoded = $this->decodeJson($encoded);
+                if (!is_array($decoded)) {
+                    continue;
+                }
+
+                $eventId = isset($decoded['id']) ? (int) $decoded['id'] : 0;
+                if ($sinceId !== null && $eventId <= $sinceId) {
+                    continue;
+                }
+
+                $events[] = $decoded;
+                if ($eventId > $latestId) {
+                    $latestId = $eventId;
+                }
+            }
+
+            if ($latestId === 0) {
+                $latest = $this->getLatestUserSequence($userId);
+                if ($latest !== null) {
+                    $latestId = $latest;
+                }
+            }
+
+            return [
+                'events' => $events,
+                'latestId' => $latestId > 0 ? $latestId : null,
+                'retry' => self::DEFAULT_RETRY_MS,
+            ];
+        } catch (\Throwable $exception) {
+            $this->logger->error('Failed to fetch user updates from Redis.', [
+                'userId' => $userId,
+                'exception' => $exception,
+            ]);
+
+            return [
+                'events' => [],
+                'latestId' => $sinceId,
+                'retry' => self::DEFAULT_RETRY_MS,
+            ];
+        }
+    }
+
     public function getLatestSequence(int $boardId): ?int
     {
         $client = $this->getClient();
@@ -131,6 +224,21 @@ class RealtimeUpdateStore
         }
 
         $value = $client->get($this->sequenceKey($boardId));
+        if ($value === null) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    public function getLatestUserSequence(int $userId): ?int
+    {
+        $client = $this->getClient();
+        if ($client === null) {
+            return null;
+        }
+
+        $value = $client->get($this->userSequenceKey($userId));
         if ($value === null) {
             return null;
         }
@@ -290,6 +398,16 @@ class RealtimeUpdateStore
     private function sequenceKey(int $boardId): string
     {
         return sprintf('board:%d:seq', $boardId);
+    }
+
+    private function userEventsKey(int $userId): string
+    {
+        return sprintf('user:%d:events', $userId);
+    }
+
+    private function userSequenceKey(int $userId): string
+    {
+        return sprintf('user:%d:seq', $userId);
     }
 
     private function snapshotKey(int $boardId): string

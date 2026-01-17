@@ -12,6 +12,17 @@ use App\Entity\User;
 
 class BoardSerializer
 {
+    public function serializeBoardSummary(Board $board): array
+    {
+        return [
+            'id' => $board->getId(),
+            'name' => $board->getName(),
+            'slug' => $board->getSlug(),
+            'description' => $board->getDescription(),
+            'updatedAt' => $board->getUpdatedAt()->format(DATE_ATOM),
+        ];
+    }
+
     public function serializeBoard(Board $board): array
     {
         return [
