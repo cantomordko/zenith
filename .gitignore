@@ -10,6 +10,7 @@
 ###< symfony/framework-bundle ###
 
 ###> environment files with sensitive data ###
+/.env
 /.env.dev
 /.env.test
 /.env.prod
@@ -34,3 +35,5 @@ Thumbs.db
 /public/assets/
 /assets/vendor/
 ###< symfony/asset-mapper ###
+.env
+config/packages/cache.yaml
