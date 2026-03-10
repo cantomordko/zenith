@@ -148,7 +148,16 @@ class BoardApiController extends AbstractController
             $sinceId = (int) $sinceParam;
         }
 
-        $updates = $this->updateStore->fetchUpdates($board->getId(), $sinceId);
+        $waitParam = $request->query->get('wait');
+        $waitMs = 15000;
+        if ($waitParam !== null && $waitParam !== '') {
+            if (!ctype_digit((string) $waitParam)) {
+                return $this->json(['error' => 'Parametr wait musi być liczbą całkowitą.'], Response::HTTP_BAD_REQUEST);
+            }
+            $waitMs = (int) $waitParam;
+        }
+
+        $updates = $this->updateStore->waitForUpdates($board->getId(), $sinceId, $waitMs);
 
         return $this->json($updates);
     }
@@ -169,7 +178,16 @@ class BoardApiController extends AbstractController
             $sinceId = (int) $sinceParam;
         }
 
-        $updates = $this->updateStore->fetchUserUpdates($user->getId(), $sinceId);
+        $waitParam = $request->query->get('wait');
+        $waitMs = 15000;
+        if ($waitParam !== null && $waitParam !== '') {
+            if (!ctype_digit((string) $waitParam)) {
+                return $this->json(['error' => 'Parametr wait musi być liczbą całkowitą.'], Response::HTTP_BAD_REQUEST);
+            }
+            $waitMs = (int) $waitParam;
+        }
+
+        $updates = $this->updateStore->waitForUserUpdates($user->getId(), $sinceId, $waitMs);
 
         return $this->json($updates);
     }

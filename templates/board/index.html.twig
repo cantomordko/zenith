@@ -74,7 +74,8 @@
                         return;
                     }
 
-                    const MIN_DELAY_MS = 2000;
+                    const WAIT_TIMEOUT_MS = 15000;
+                    const MIN_DELAY_MS = 250;
                     const MAX_DELAY_MS = 10000;
                     let nextDelay = MIN_DELAY_MS;
 
@@ -83,10 +84,17 @@
                     };
 
                     const poll = async () => {
+                        if (document.hidden) {
+                            nextDelay = 5000;
+                            scheduleNext(nextDelay);
+                            return;
+                        }
+
                         let requestUrl = endpoint;
                         if (updatesCursor !== null) {
                             requestUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}since=${encodeURIComponent(updatesCursor)}`;
                         }
+                        requestUrl = `${requestUrl}${requestUrl.includes('?') ? '&' : '?'}wait=${WAIT_TIMEOUT_MS}`;
 
                         try {
                             const data = await fetchJson(requestUrl);
@@ -115,6 +123,12 @@
                     };
 
                     poll();
+
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) {
+                            poll();
+                        }
+                    });
                 };
 
                 startRealtimeUpdates(updatesUrl);

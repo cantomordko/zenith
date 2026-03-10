@@ -15,6 +15,7 @@ class RealtimeUpdateStore
     private const LIST_TTL_SECONDS = 43200;
     private const LIST_MAX_LENGTH = 200;
     private const DEFAULT_RETRY_MS = 3000;
+    private const LONG_POLL_INTERVAL_US = 500000;
 
     private ?ClientInterface $client = null;
     private bool $connectionFailed = false;
@@ -155,6 +156,31 @@ class RealtimeUpdateStore
         }
     }
 
+    public function waitForUpdates(int $boardId, ?int $sinceId = null, int $timeoutMs = 15000): array
+    {
+        $timeoutMs = max(0, min($timeoutMs, 30000));
+        $startedAt = microtime(true);
+
+        do {
+            $updates = $this->fetchUpdates($boardId, $sinceId);
+            $events = $updates['events'] ?? [];
+            if (!empty($events)) {
+                $updates['retry'] = 250;
+                return $updates;
+            }
+
+            if ($timeoutMs === 0) {
+                break;
+            }
+
+            usleep(self::LONG_POLL_INTERVAL_US);
+        } while (((microtime(true) - $startedAt) * 1000) < $timeoutMs);
+
+        $updates['retry'] = 250;
+
+        return $updates;
+    }
+
     public function fetchUserUpdates(int $userId, ?int $sinceId = null): array
     {
         $client = $this->getClient();
@@ -214,6 +240,31 @@ class RealtimeUpdateStore
                 'retry' => self::DEFAULT_RETRY_MS,
             ];
         }
+    }
+
+    public function waitForUserUpdates(int $userId, ?int $sinceId = null, int $timeoutMs = 15000): array
+    {
+        $timeoutMs = max(0, min($timeoutMs, 30000));
+        $startedAt = microtime(true);
+
+        do {
+            $updates = $this->fetchUserUpdates($userId, $sinceId);
+            $events = $updates['events'] ?? [];
+            if (!empty($events)) {
+                $updates['retry'] = 250;
+                return $updates;
+            }
+
+            if ($timeoutMs === 0) {
+                break;
+            }
+
+            usleep(self::LONG_POLL_INTERVAL_US);
+        } while (((microtime(true) - $startedAt) * 1000) < $timeoutMs);
+
+        $updates['retry'] = 250;
+
+        return $updates;
     }
 
     public function getLatestSequence(int $boardId): ?int
@@ -309,6 +360,34 @@ class RealtimeUpdateStore
             return [];
         }
 
+        if (preg_match('#^(redis|unix):///([^?]+)(?:\?(.*))?$#', $dsn, $matches) === 1) {
+            $query = [];
+            if (isset($matches[3]) && $matches[3] !== '') {
+                parse_str($matches[3], $query);
+            }
+
+            $config = [
+                'scheme' => 'unix',
+                'path' => '/'.$matches[2],
+            ];
+
+            if (isset($query['db'])) {
+                $config['database'] = (int) $query['db'];
+            } elseif (isset($query['dbindex'])) {
+                $config['database'] = (int) $query['dbindex'];
+            }
+
+            if (isset($query['timeout'])) {
+                $config['timeout'] = (float) $query['timeout'];
+            }
+
+            if (isset($query['read_timeout'])) {
+                $config['read_write_timeout'] = (float) $query['read_timeout'];
+            }
+
+            return $config;
+        }
+
         if (str_starts_with($dsn, '/')) {
             return [
                 'scheme' => 'unix',
@@ -354,6 +433,8 @@ class RealtimeUpdateStore
 
         if (isset($query['db'])) {
             $config['database'] = (int) $query['db'];
+        } elseif (isset($query['dbindex'])) {
+            $config['database'] = (int) $query['dbindex'];
         } elseif (($config['scheme'] ?? '') !== 'unix' && isset($parts['path']) && $parts['path'] !== '') {
             $db = ltrim($parts['path'], '/');
             if ($db !== '') {
