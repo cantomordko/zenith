@@ -28,6 +28,8 @@ class TimeEntryRepository extends ServiceEntityRepository
         ?int $userId = null
     ): array {
         $qb = $this->createQueryBuilder('te')
+            ->addSelect('author', 'c', 'col')
+            ->innerJoin('te.author', 'author')
             ->innerJoin('te.card', 'c')
             ->innerJoin('c.column', 'col')
             ->innerJoin('col.board', 'b')
@@ -51,6 +53,26 @@ class TimeEntryRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    public function getTrackedMinutesByBoard(Board $board): array
+    {
+        $rows = $this->createQueryBuilder('te')
+            ->select('card.id AS cardId, COALESCE(SUM(te.minutesSpent), 0) AS trackedMinutes')
+            ->innerJoin('te.card', 'card')
+            ->innerJoin('card.column', 'boardColumn')
+            ->andWhere('boardColumn.board = :board')
+            ->setParameter('board', $board)
+            ->groupBy('card.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $totals[(int) $row['cardId']] = (int) $row['trackedMinutes'];
+        }
+
+        return $totals;
     }
 }
 

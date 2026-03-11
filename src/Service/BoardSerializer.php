@@ -23,7 +23,7 @@ class BoardSerializer
         ];
     }
 
-    public function serializeBoard(Board $board): array
+    public function serializeBoard(Board $board, array $cardMetrics = []): array
     {
         return [
             'id' => $board->getId(),
@@ -31,7 +31,7 @@ class BoardSerializer
             'slug' => $board->getSlug(),
             'description' => $board->getDescription(),
             'updatedAt' => $board->getUpdatedAt()->format(DATE_ATOM),
-            'columns' => $board->getColumns()->map(fn (BoardColumn $column) => $this->serializeColumn($column))->toArray(),
+            'columns' => $board->getColumns()->map(fn (BoardColumn $column) => $this->serializeColumn($column, $cardMetrics))->toArray(),
             'members' => $board->getMemberships()->map(fn (BoardMembership $membership) => [
                 'id' => $membership->getUser()->getId(),
                 'displayName' => $membership->getUser()->getDisplayName(),
@@ -40,17 +40,17 @@ class BoardSerializer
         ];
     }
 
-    public function serializeColumn(BoardColumn $column): array
+    public function serializeColumn(BoardColumn $column, array $cardMetrics = []): array
     {
         return [
             'id' => $column->getId(),
             'title' => $column->getTitle(),
             'position' => $column->getPosition(),
-            'cards' => $column->getCards()->map(fn (Card $card) => $this->serializeCard($card))->toArray(),
+            'cards' => $column->getCards()->map(fn (Card $card) => $this->serializeCard($card, $cardMetrics[$card->getId()] ?? null))->toArray(),
         ];
     }
 
-    public function serializeCard(Card $card): array
+    public function serializeCard(Card $card, ?array $metrics = null): array
     {
         return [
             'id' => $card->getId(),
@@ -63,9 +63,9 @@ class BoardSerializer
                 'id' => $user->getId(),
                 'displayName' => $user->getDisplayName(),
             ])->toArray(),
-            'commentCount' => $card->getComments()->count(),
+            'commentCount' => $metrics['commentCount'] ?? $card->getComments()->count(),
             'estimatedMinutes' => $card->getEstimatedMinutes(),
-            'trackedMinutes' => $card->calculateTotalTrackedMinutes(),
+            'trackedMinutes' => $metrics['trackedMinutes'] ?? $card->calculateTotalTrackedMinutes(),
             'archived' => $card->isArchived(),
         ];
     }

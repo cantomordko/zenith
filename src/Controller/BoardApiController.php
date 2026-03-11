@@ -15,6 +15,7 @@ use App\Repository\BoardRepository;
 use App\Repository\CardRepository;
 use App\Repository\UserRepository;
 use App\Security\BoardAccessService;
+use App\Service\BoardSnapshotProvider;
 use App\Service\BoardSerializer;
 use App\Service\BoardUpdatePublisher;
 use App\Service\RealtimeUpdateStore;
@@ -49,6 +50,7 @@ class BoardApiController extends AbstractController
         private readonly BoardMembershipRepository $membershipRepository,
         private readonly CardRepository $cardRepository,
         private readonly UserRepository $userRepository,
+        private readonly BoardSnapshotProvider $boardSnapshotProvider,
         private readonly BoardSerializer $boardSerializer,
         private readonly BoardUpdatePublisher $updatePublisher,
         private readonly RealtimeUpdateStore $updateStore,
@@ -121,14 +123,19 @@ class BoardApiController extends AbstractController
     }
 
     #[Route('/boards/{id}', name: 'api_board_view', methods: ['GET'])]
-    public function getBoard(Board $board): JsonResponse
+    public function getBoard(int $id): JsonResponse
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
+        $board = $this->boardRepository->findOneByIdWithSnapshot($id);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Nie znaleziono tablicy.'], Response::HTTP_NOT_FOUND);
+        }
+
         /** @var User $user */
         $user = $this->getUser();
         $this->boardAccess->assertCanAccess($board, $user);
 
-        return $this->json($this->boardSerializer->serializeBoard($board));
+        return $this->json($this->boardSnapshotProvider->createPayload($board));
     }
 
     #[Route('/boards/{id}/updates', name: 'api_board_updates', methods: ['GET'])]
@@ -149,7 +156,7 @@ class BoardApiController extends AbstractController
         }
 
         $waitParam = $request->query->get('wait');
-        $waitMs = 15000;
+        $waitMs = 5000;
         if ($waitParam !== null && $waitParam !== '') {
             if (!ctype_digit((string) $waitParam)) {
                 return $this->json(['error' => 'Parametr wait musi być liczbą całkowitą.'], Response::HTTP_BAD_REQUEST);
@@ -179,7 +186,7 @@ class BoardApiController extends AbstractController
         }
 
         $waitParam = $request->query->get('wait');
-        $waitMs = 15000;
+        $waitMs = 5000;
         if ($waitParam !== null && $waitParam !== '') {
             if (!ctype_digit((string) $waitParam)) {
                 return $this->json(['error' => 'Parametr wait musi być liczbą całkowitą.'], Response::HTTP_BAD_REQUEST);
@@ -627,6 +634,70 @@ class BoardApiController extends AbstractController
         return $this->json($this->boardSerializer->serializeComments($card), Response::HTTP_CREATED);
     }
 
+    #[Route('/comments/{id}', name: 'api_comment_update', methods: ['PATCH'])]
+    public function updateComment(CardComment $comment, Request $request): JsonResponse
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+        $card = $comment->getCard();
+        $board = $card->getColumn()->getBoard();
+        /** @var User $user */
+        $user = $this->getUser();
+        $this->boardAccess->assertCanAccess($board, $user);
+
+        if (!$this->canEditComment($comment, $user)) {
+            return $this->json(['error' => 'Nie możesz edytować tego komentarza.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = $this->decodeJson($request);
+        $content = trim((string) ($data['content'] ?? ''));
+        if ($content === '') {
+            return $this->json(['error' => 'Treść komentarza jest wymagana.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $comment->setContent($content);
+        $card->touch();
+        $board->touch();
+        $this->em->flush();
+
+        $this->updatePublisher->publish($board, 'comment.updated', [
+            'cardId' => $card->getId(),
+            'commentId' => $comment->getId(),
+            'comments' => $this->boardSerializer->serializeComments($card),
+        ]);
+
+        return $this->json($this->boardSerializer->serializeComments($card));
+    }
+
+    #[Route('/comments/{id}', name: 'api_comment_delete', methods: ['DELETE'])]
+    public function deleteComment(CardComment $comment): JsonResponse
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+        $card = $comment->getCard();
+        $board = $card->getColumn()->getBoard();
+        /** @var User $user */
+        $user = $this->getUser();
+        $membership = $this->boardAccess->assertCanAccess($board, $user);
+
+        if (!$this->canDeleteComment($comment, $user, $membership->getRole())) {
+            return $this->json(['error' => 'Nie możesz usunąć tego komentarza.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $commentId = $comment->getId();
+        $card->getComments()->removeElement($comment);
+        $this->em->remove($comment);
+        $card->touch();
+        $board->touch();
+        $this->em->flush();
+
+        $this->updatePublisher->publish($board, 'comment.deleted', [
+            'cardId' => $card->getId(),
+            'commentId' => $commentId,
+            'comments' => $this->boardSerializer->serializeComments($card),
+        ]);
+
+        return $this->json($this->boardSerializer->serializeComments($card));
+    }
+
     #[Route('/cards/{id}/time-entries', name: 'api_card_add_time_entry', methods: ['POST'])]
     public function addTimeEntry(Card $card, Request $request): JsonResponse
     {
@@ -733,6 +804,20 @@ class BoardApiController extends AbstractController
             }
             $card->addAssignee($user);
         }
+    }
+
+    private function canEditComment(CardComment $comment, User $user): bool
+    {
+        return $comment->getAuthor()->getId() === $user->getId();
+    }
+
+    private function canDeleteComment(CardComment $comment, User $user, string $membershipRole): bool
+    {
+        if ($comment->getAuthor()->getId() === $user->getId()) {
+            return true;
+        }
+
+        return in_array($membershipRole, [BoardMembership::ROLE_OWNER, BoardMembership::ROLE_ADMIN], true);
     }
 
     private function convertDurationToMinutes(mixed $value, bool $required = false): ?int

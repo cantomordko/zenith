@@ -15,7 +15,8 @@ class RealtimeUpdateStore
     private const LIST_TTL_SECONDS = 43200;
     private const LIST_MAX_LENGTH = 200;
     private const DEFAULT_RETRY_MS = 3000;
-    private const LONG_POLL_INTERVAL_US = 500000;
+    private const LONG_POLL_INTERVAL_US = 250000;
+    private const DEFAULT_WAIT_TIMEOUT_MS = 5000;
 
     private ?ClientInterface $client = null;
     private bool $connectionFailed = false;
@@ -156,9 +157,9 @@ class RealtimeUpdateStore
         }
     }
 
-    public function waitForUpdates(int $boardId, ?int $sinceId = null, int $timeoutMs = 15000): array
+    public function waitForUpdates(int $boardId, ?int $sinceId = null, int $timeoutMs = self::DEFAULT_WAIT_TIMEOUT_MS): array
     {
-        $timeoutMs = max(0, min($timeoutMs, 30000));
+        $timeoutMs = max(0, min($timeoutMs, 10000));
         $startedAt = microtime(true);
 
         do {
@@ -176,7 +177,7 @@ class RealtimeUpdateStore
             usleep(self::LONG_POLL_INTERVAL_US);
         } while (((microtime(true) - $startedAt) * 1000) < $timeoutMs);
 
-        $updates['retry'] = 250;
+        $updates['retry'] = self::DEFAULT_RETRY_MS;
 
         return $updates;
     }
@@ -242,9 +243,9 @@ class RealtimeUpdateStore
         }
     }
 
-    public function waitForUserUpdates(int $userId, ?int $sinceId = null, int $timeoutMs = 15000): array
+    public function waitForUserUpdates(int $userId, ?int $sinceId = null, int $timeoutMs = self::DEFAULT_WAIT_TIMEOUT_MS): array
     {
-        $timeoutMs = max(0, min($timeoutMs, 30000));
+        $timeoutMs = max(0, min($timeoutMs, 10000));
         $startedAt = microtime(true);
 
         do {
@@ -262,7 +263,7 @@ class RealtimeUpdateStore
             usleep(self::LONG_POLL_INTERVAL_US);
         } while (((microtime(true) - $startedAt) * 1000) < $timeoutMs);
 
-        $updates['retry'] = 250;
+        $updates['retry'] = self::DEFAULT_RETRY_MS;
 
         return $updates;
     }

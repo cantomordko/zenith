@@ -6,6 +6,7 @@ use App\Entity\Board;
 use App\Entity\BoardMembership;
 use App\Entity\User;
 use App\Repository\BoardMembershipRepository;
+use Doctrine\ORM\PersistentCollection;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 class BoardAccessService
@@ -16,6 +17,27 @@ class BoardAccessService
 
     public function assertCanAccess(Board $board, User $user): BoardMembership
     {
+        $memberships = $board->getMemberships();
+
+        if (
+            $board->getOwner()->getId() === $user->getId()
+            && (!$memberships instanceof PersistentCollection || $memberships->isInitialized())
+        ) {
+            foreach ($board->getMemberships() as $membership) {
+                if ($membership->getUser()->getId() === $user->getId()) {
+                    return $membership;
+                }
+            }
+        }
+
+        if (!$memberships instanceof PersistentCollection || $memberships->isInitialized()) {
+            foreach ($memberships as $membership) {
+                if ($membership->getUser()->getId() === $user->getId()) {
+                    return $membership;
+                }
+            }
+        }
+
         $membership = $this->membershipRepository->findMembership($board, $user);
         if (!$membership) {
             throw new AccessDeniedException('Nie masz dostępu do tej tablicy.');

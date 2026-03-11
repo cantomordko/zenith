@@ -59,4 +59,47 @@ class CardRepository extends ServiceEntityRepository
 
         return $maxPosition !== null ? ((int) $maxPosition + 1) : 0;
     }
+
+    public function getBoardCardMetrics(Board $board): array
+    {
+        $metrics = [];
+
+        $commentRows = $this->createQueryBuilder('card')
+            ->select('card.id AS cardId, COUNT(comment.id) AS commentCount')
+            ->innerJoin('card.column', 'boardColumn')
+            ->leftJoin('card.comments', 'comment')
+            ->andWhere('boardColumn.board = :board')
+            ->setParameter('board', $board)
+            ->groupBy('card.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        foreach ($commentRows as $row) {
+            $metrics[(int) $row['cardId']] = [
+                'commentCount' => (int) $row['commentCount'],
+                'trackedMinutes' => 0,
+            ];
+        }
+
+        $trackedRows = $this->createQueryBuilder('card')
+            ->select('card.id AS cardId, COALESCE(SUM(timeEntry.minutesSpent), 0) AS trackedMinutes')
+            ->innerJoin('card.column', 'boardColumn')
+            ->leftJoin('card.timeEntries', 'timeEntry')
+            ->andWhere('boardColumn.board = :board')
+            ->setParameter('board', $board)
+            ->groupBy('card.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        foreach ($trackedRows as $row) {
+            $cardId = (int) $row['cardId'];
+            $metrics[$cardId] ??= [
+                'commentCount' => 0,
+                'trackedMinutes' => 0,
+            ];
+            $metrics[$cardId]['trackedMinutes'] = (int) $row['trackedMinutes'];
+        }
+
+        return $metrics;
+    }
 }

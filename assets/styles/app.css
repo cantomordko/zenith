@@ -239,6 +239,19 @@ a:hover {
 	box-shadow: var(--zen-shadow-xs);
 }
 
+.zen-user-chip--toggle {
+	appearance: none;
+	cursor: pointer;
+	text-align: left;
+}
+
+.zen-user-chip--toggle:hover,
+.zen-user-chip--toggle:focus-visible {
+	border-color: rgba(54, 153, 255, 0.28);
+	background: var(--zen-primary-soft);
+	outline: none;
+}
+
 .zen-user-chip__avatar {
 	width: 2rem;
 	height: 2rem;
@@ -250,6 +263,28 @@ a:hover {
 	color: var(--zen-primary-dark);
 	font-size: 0.75rem;
 	font-weight: 800;
+}
+
+.zen-user-chip__avatar--large {
+	width: 3rem;
+	height: 3rem;
+	font-size: 1rem;
+	flex-shrink: 0;
+}
+
+.zen-user-chip__avatar-image {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: inherit;
+	display: block;
+}
+
+.zen-user-chip__caret {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--zen-text-muted);
 }
 
 .zen-theme-toggle {
@@ -305,6 +340,59 @@ html[data-theme='dark'] .zen-theme-toggle__icon--moon {
 	font-size: 0.68rem;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
+}
+
+.zen-account-dropdown {
+	width: min(24rem, calc(100vw - 2rem));
+	overflow: hidden;
+}
+
+.zen-account-dropdown__header {
+	display: flex;
+	align-items: center;
+	gap: 0.9rem;
+	padding: 1rem 1rem 0.9rem;
+	border-bottom: 1px solid var(--zen-border);
+	background: var(--zen-surface-soft);
+}
+
+.zen-account-dropdown__name {
+	font-size: 0.95rem;
+	font-weight: 800;
+	color: var(--zen-text);
+}
+
+.zen-account-dropdown__email {
+	font-size: 0.8rem;
+	color: var(--zen-text-muted);
+	word-break: break-all;
+}
+
+.zen-account-form {
+	padding: 1rem;
+}
+
+.zen-account-form .form-control[readonly] {
+	opacity: 0.82;
+	cursor: default;
+}
+
+.zen-account-form .form-check {
+	padding-left: 0;
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+}
+
+.zen-account-form .form-check-input {
+	margin: 0;
+	flex-shrink: 0;
+}
+
+.zen-account-dropdown__footer {
+	padding: 1rem;
+	border-top: 1px solid var(--zen-border);
+	background: var(--zen-surface-soft);
 }
 
 .zen-main {
@@ -1093,8 +1181,8 @@ html[data-theme='dark'] .btn-secondary {
 	border-left: 0;
 	border-right: 0;
 	border-radius: 0;
-	padding-left: 0;
-	padding-right: 0;
+	padding-left: 1rem;
+	padding-right: 1rem;
 }
 
 .list-group-flush > .list-group-item:first-child {
@@ -1109,6 +1197,52 @@ html[data-theme='dark'] .btn-secondary {
 	background: transparent;
 	border-color: var(--zen-border);
 	color: var(--zen-text);
+}
+
+.comment-item-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	flex-wrap: nowrap;
+	margin-bottom: 0.35rem;
+}
+
+.comment-item-meta {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.comment-item-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	flex: 0 0 auto;
+	flex-wrap: nowrap;
+	margin-left: auto;
+	text-align: right;
+	min-width: max-content;
+}
+
+.comment-item-actions .btn {
+	white-space: nowrap;
+	line-height: 1.2;
+}
+
+@media (max-width: 575.98px) {
+	.list-group-flush > .list-group-item {
+		padding-left: 0.75rem;
+		padding-right: 0.75rem;
+	}
+
+	.comment-item-header {
+		flex-wrap: wrap;
+	}
+
+	.comment-item-actions {
+		width: 100%;
+	}
 }
 
 .list-group-item .text-muted {

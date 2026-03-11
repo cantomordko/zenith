@@ -7,7 +7,7 @@ use App\Entity\User;
 use App\Repository\BoardRepository;
 use App\Repository\TimeEntryRepository;
 use App\Security\BoardAccessService;
-use App\Service\BoardSerializer;
+use App\Service\BoardSnapshotProvider;
 use App\Service\RealtimeUpdateStore;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +19,7 @@ class BoardController extends AbstractController
 {
     public function __construct(
         private readonly BoardRepository $boardRepository,
-        private readonly BoardSerializer $boardSerializer,
+        private readonly BoardSnapshotProvider $boardSnapshotProvider,
         private readonly BoardAccessService $boardAccess,
         private readonly TimeEntryRepository $timeEntryRepository,
         private readonly RealtimeUpdateStore $updateStore,
@@ -47,7 +47,7 @@ class BoardController extends AbstractController
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
         /** @var Board|null $board */
-        $board = $this->boardRepository->findOneBy(['slug' => $slug]);
+        $board = $this->boardRepository->findOneBySlugWithSnapshot($slug);
         if (!$board) {
             throw $this->createNotFoundException('Nie znaleziono tablicy.');
         }
@@ -56,7 +56,7 @@ class BoardController extends AbstractController
         $user = $this->getUser();
         $this->boardAccess->assertCanAccess($board, $user);
 
-        $boardPayload = $this->boardSerializer->serializeBoard($board);
+        $boardPayload = $this->boardSnapshotProvider->createPayload($board);
 
         $updatesCursor = $this->updateStore->getLatestSequence($board->getId());
 
@@ -81,23 +81,21 @@ class BoardController extends AbstractController
 
         /** @var \App\Entity\User $user */
         $user = $this->getUser();
-            $deadlineSoonMinutes = 24 * 60;
+        $this->boardAccess->assertCanAccess($board, $user);
 
-        // Pobierz parametry filtrowania
         $dateFrom = $request->query->get('date_from');
         $dateTo = $request->query->get('date_to');
         $selectedUserId = $request->query->get('user_id');
         $selectedUserId = is_numeric($selectedUserId) ? (int) $selectedUserId : null;
 
-        // Pobierz wszystkie time entries dla tablicy
         $timeEntries = $this->timeEntryRepository->findByBoard(
             $board,
             $dateFrom ? new \DateTimeImmutable($dateFrom) : null,
             $dateTo ? new \DateTimeImmutable($dateTo) : null,
             $selectedUserId
         );
+        $trackedMinutesByCard = $this->timeEntryRepository->getTrackedMinutesByBoard($board);
 
-        // Oblicz statystyki
         $totalMinutes = 0;
         $entriesByUser = [];
         $entriesByCard = [];
@@ -135,7 +133,7 @@ class BoardController extends AbstractController
         foreach ($entriesByCard as $cardId => &$cardSummary) {
             $card = $cardSummary['card'];
             $estimate = $card->getEstimatedMinutes();
-            $trackedTotal = $card->calculateTotalTrackedMinutes();
+            $trackedTotal = $trackedMinutesByCard[$cardId] ?? 0;
             $overrun = $estimate !== null && $estimate > 0 && $trackedTotal > $estimate;
             $overrunMinutes = $overrun ? $trackedTotal - $estimate : 0;
 
@@ -172,7 +170,6 @@ class BoardController extends AbstractController
         }
         unset($cardSummary);
 
-        // Sortuj po czasie malejąco
         usort($entriesByUser, fn($a, $b) => $b['minutes'] <=> $a['minutes']);
         usort($entriesByCard, fn($a, $b) => $b['minutes'] <=> $a['minutes']);
 

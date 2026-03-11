@@ -30,4 +30,41 @@ class BoardRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function findOneBySlugWithSnapshot(string $slug): ?Board
+    {
+        return $this->createSnapshotQueryBuilder()
+            ->andWhere('b.slug = :slug')
+            ->setParameter('slug', $slug)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findOneByIdWithSnapshot(int $id): ?Board
+    {
+        return $this->createSnapshotQueryBuilder()
+            ->andWhere('b.id = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    private function createSnapshotQueryBuilder()
+    {
+        return $this->createQueryBuilder('b')
+            ->distinct()
+            ->leftJoin('b.memberships', 'memberships')
+            ->addSelect('memberships')
+            ->leftJoin('memberships.user', 'memberUser')
+            ->addSelect('memberUser')
+            ->leftJoin('b.columns', 'columns')
+            ->addSelect('columns')
+            ->leftJoin('columns.cards', 'cards')
+            ->addSelect('cards')
+            ->leftJoin('cards.assignees', 'assignees')
+            ->addSelect('assignees')
+            ->orderBy('columns.position', 'ASC')
+            ->addOrderBy('cards.position', 'ASC')
+            ->addOrderBy('memberships.id', 'ASC');
+    }
 }

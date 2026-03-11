@@ -321,14 +321,67 @@
                     </button>
                     {% if app.user %}
                         {% set userLabel = app.user.displayName|default(app.user.userIdentifier) %}
-                        <span class="zen-user-chip">
-                            <span class="zen-user-chip__avatar">{{ userLabel|slice(0, 1)|upper }}</span>
-                            <span class="zen-user-chip__meta">
-                                <span class="zen-user-chip__name">{{ userLabel }}</span>
-                                <span class="zen-user-chip__label">Aktywna sesja</span>
-                            </span>
-                        </span>
-                        <a class="btn btn-sm btn-outline-light" href="{{ path('app_logout') }}">Wyloguj</a>
+                        <div class="dropdown" data-bs-auto-close="outside">
+                            <button class="zen-user-chip zen-user-chip--toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span class="zen-user-chip__avatar">
+                                    {% if app.user.avatarPath %}
+                                        <img class="zen-user-chip__avatar-image" src="{{ asset(app.user.avatarPath) }}" alt="{{ userLabel }}">
+                                    {% else %}
+                                        {{ userLabel|slice(0, 1)|upper }}
+                                    {% endif %}
+                                </span>
+                                <span class="zen-user-chip__meta">
+                                    <span class="zen-user-chip__name">{{ userLabel }}</span>
+                                    <span class="zen-user-chip__label">Aktywna sesja</span>
+                                </span>
+                                <span class="zen-user-chip__caret" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 1rem; height: 1rem;">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end zen-account-dropdown p-0">
+                                <div class="zen-account-dropdown__header">
+                                    <span class="zen-user-chip__avatar zen-user-chip__avatar--large">
+                                        {% if app.user.avatarPath %}
+                                            <img class="zen-user-chip__avatar-image" src="{{ asset(app.user.avatarPath) }}" alt="{{ userLabel }}">
+                                        {% else %}
+                                            {{ userLabel|slice(0, 1)|upper }}
+                                        {% endif %}
+                                    </span>
+                                    <div>
+                                        <div class="zen-account-dropdown__name">{{ userLabel }}</div>
+                                        <div class="zen-account-dropdown__email">{{ app.user.userIdentifier }}</div>
+                                    </div>
+                                </div>
+                                <form class="zen-account-form" action="{{ path('app_account_profile_update') }}" method="post" enctype="multipart/form-data">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('profile_update') }}">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="account-display-name">Imię i nazwisko</label>
+                                        <input class="form-control" type="text" id="account-display-name" name="display_name" value="{{ app.user.displayName }}" minlength="3" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="account-email">Adres e-mail</label>
+                                        <input class="form-control" type="email" id="account-email" value="{{ app.user.userIdentifier }}" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="account-avatar">Zdjęcie profilowe</label>
+                                        <input class="form-control" type="file" id="account-avatar" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif">
+                                        <div class="form-text">JPG, PNG, WEBP lub GIF. Maksymalnie 2 MB.</div>
+                                    </div>
+                                    {% if app.user.avatarPath %}
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" value="1" id="remove-avatar" name="remove_avatar">
+                                            <label class="form-check-label" for="remove-avatar">Usuń obecne zdjęcie</label>
+                                        </div>
+                                    {% endif %}
+                                    <button class="btn btn-primary w-100" type="submit">Zapisz zmiany</button>
+                                </form>
+                                <div class="zen-account-dropdown__footer">
+                                    <a class="btn btn-outline-light w-100" href="{{ path('app_logout') }}">Wyloguj</a>
+                                </div>
+                            </div>
+                        </div>
                     {% else %}
                         <a class="btn btn-sm btn-outline-light" href="{{ path('app_login') }}">Logowanie</a>
                         <a class="btn btn-sm btn-primary" href="{{ path('app_register') }}">Rejestracja</a>

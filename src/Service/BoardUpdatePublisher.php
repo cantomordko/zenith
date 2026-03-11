@@ -9,6 +9,7 @@ class BoardUpdatePublisher
 {
     public function __construct(
         private readonly RealtimeUpdateStore $realtimeStore,
+        private readonly BoardSnapshotProvider $boardSnapshotProvider,
         private readonly BoardSerializer $serializer,
         private readonly LoggerInterface $logger,
     ) {
@@ -16,11 +17,15 @@ class BoardUpdatePublisher
 
     public function publish(Board $board, string $event, array $context = []): void
     {
+        $snapshot = $board->getId() !== null
+            ? $this->boardSnapshotProvider->createPayloadByBoardId($board->getId())
+            : null;
+
         $payload = [
             'event' => $event,
             'boardId' => $board->getId(),
             'payload' => $context,
-            'snapshot' => $this->serializer->serializeBoard($board),
+            'snapshot' => $snapshot ?? $this->serializer->serializeBoard($board),
         ];
 
         try {

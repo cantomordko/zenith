@@ -40,6 +40,7 @@
 
                 let boardState = safeJsonParse(wrapper.dataset.board) ?? {};
                 const boardId = Number(wrapper.dataset.boardId);
+                const currentUserId = Number(wrapper.dataset.currentUserId);
                 const updatesUrl = wrapper.dataset.updates;
                 const updatesCursorRaw = wrapper.dataset.updatesCursor ?? '';
                 let updatesCursor = Number.parseInt(updatesCursorRaw, 10);
@@ -67,12 +68,15 @@
                 const assigneeSelector = document.getElementById('assignee-selector');
                 const deleteCardButton = document.getElementById('delete-card-button');
                 const addCommentButton = document.getElementById('add-comment-button');
+                const cancelCommentEditButton = document.getElementById('cancel-comment-edit-button');
                 const addTimeEntryButton = document.getElementById('add-time-entry-button');
                 const commentSection = document.getElementById('comment-section');
                 const timeTrackingSection = document.getElementById('time-tracking-section');
                 const timeDurationInput = document.getElementById('time-duration');
                 const deadlineField = document.getElementById('card-due');
                 const deadlineLabel = document.querySelector('label[for="card-due"]');
+                const commentContent = document.getElementById('comment-content');
+                const commentsContainer = document.getElementById('card-comments');
 
                 const dragState = {
                     cardId: null,
@@ -84,7 +88,12 @@
 
                 const cardModalState = {
                     isOpening: false,
+                    requestId: 0,
                 };
+
+                let consistencyRefreshTimer = null;
+                let editingCommentId = null;
+                let latestComments = [];
 
                 if (deadlineField) {
                     deadlineField.addEventListener('change', () => updateDeadlineFieldState(deadlineField));
@@ -129,7 +138,7 @@
                             });
                             memberForm.reset();
                             memberForm.role.value = 'member';
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             showError(memberErrorBox, error.message ?? 'Nie udało się dodać użytkownika.');
                         } finally {
@@ -155,7 +164,7 @@
                             await fetchJson(`/api/boards/${boardId}/members/${userId}`, {
                                 method: 'DELETE',
                             });
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             alert(error.message ?? 'Nie udało się usunąć członka.');
                         }
@@ -215,7 +224,7 @@
                                 columnModal.hide();
                             }
                             columnForm.reset();
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             showError(columnErrorBox, error.message ?? 'Nie udało się zapisać kolumny.');
                         } finally {
@@ -311,7 +320,7 @@
                             if (cardModal) {
                                 cardModal.hide();
                             }
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             showError(cardErrorBox, error.message ?? 'Nie udało się zapisać karty.');
                         } finally {
@@ -331,7 +340,7 @@
                             if (cardModal) {
                                 cardModal.hide();
                             }
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             showError(cardErrorBox, error.message ?? 'Nie udało się usunąć karty.');
                         }
@@ -341,7 +350,7 @@
                 if (addCommentButton) {
                     addCommentButton.addEventListener('click', async () => {
                         const cardId = cardForm?.cardId.value;
-                        const contentEl = document.getElementById('comment-content');
+                        const contentEl = commentContent;
                         if (!cardId || !contentEl) {
                             return;
                         }
@@ -350,15 +359,68 @@
                             return;
                         }
                         try {
-                            const comments = await fetchJson(`/api/cards/${cardId}/comments`, {
-                                method: 'POST',
-                                body: JSON.stringify({ content }),
+                            const comments = editingCommentId
+                                ? await fetchJson(`/api/comments/${editingCommentId}`, {
+                                    method: 'PATCH',
+                                    body: JSON.stringify({ content }),
+                                })
+                                : await fetchJson(`/api/cards/${cardId}/comments`, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ content }),
+                                });
+                            renderComments(comments);
+                            resetCommentComposer();
+                            scheduleConsistencyRefresh();
+                        } catch (error) {
+                            alert(error.message ?? (editingCommentId ? 'Nie udało się zaktualizować komentarza.' : 'Nie udało się dodać komentarza.'));
+                        }
+                    });
+                }
+
+                if (cancelCommentEditButton) {
+                    cancelCommentEditButton.addEventListener('click', () => {
+                        resetCommentComposer();
+                    });
+                }
+
+                if (commentsContainer) {
+                    commentsContainer.addEventListener('click', async (event) => {
+                        const editButton = event.target.closest('[data-action="edit-comment"]');
+                        if (editButton) {
+                            const commentId = editButton.dataset.commentId;
+                            const comment = latestComments.find((item) => String(item.id) === String(commentId));
+                            if (!comment || !commentContent) {
+                                return;
+                            }
+                            editingCommentId = String(comment.id);
+                            commentContent.value = comment.content ?? '';
+                            updateCommentComposerUi();
+                            commentContent.focus();
+                            commentContent.setSelectionRange(commentContent.value.length, commentContent.value.length);
+                            return;
+                        }
+
+                        const deleteButton = event.target.closest('[data-action="delete-comment"]');
+                        if (!deleteButton) {
+                            return;
+                        }
+
+                        const commentId = deleteButton.dataset.commentId;
+                        if (!commentId || !window.confirm('Czy na pewno chcesz usunąć ten komentarz?')) {
+                            return;
+                        }
+
+                        try {
+                            const comments = await fetchJson(`/api/comments/${commentId}`, {
+                                method: 'DELETE',
                             });
                             renderComments(comments);
-                            contentEl.value = '';
-                            await refreshBoard();
+                            if (String(editingCommentId) === String(commentId)) {
+                                resetCommentComposer();
+                            }
+                            scheduleConsistencyRefresh();
                         } catch (error) {
-                            alert(error.message ?? 'Nie udało się dodać komentarza.');
+                            alert(error.message ?? 'Nie udało się usunąć komentarza.');
                         }
                     });
                 }
@@ -390,7 +452,7 @@
                             if (noteEl) {
                                 noteEl.value = '';
                             }
-                            await refreshBoard();
+                            scheduleConsistencyRefresh();
                         } catch (error) {
                             alert(error.message ?? 'Nie udało się zapisać czasu.');
                         }
@@ -401,10 +463,26 @@
                     if (!snapshot) {
                         return;
                     }
+                    clearConsistencyRefresh();
                     boardState = snapshot;
                     renderBoard(boardState);
                     renderMembers(boardState);
                     renderAssigneeSelector(getSelectedAssigneeIds());
+                }
+
+                function clearConsistencyRefresh() {
+                    if (consistencyRefreshTimer !== null) {
+                        window.clearTimeout(consistencyRefreshTimer);
+                        consistencyRefreshTimer = null;
+                    }
+                }
+
+                function scheduleConsistencyRefresh(delay = 1200) {
+                    clearConsistencyRefresh();
+                    consistencyRefreshTimer = window.setTimeout(() => {
+                        consistencyRefreshTimer = null;
+                        refreshBoard();
+                    }, delay);
                 }
 
                 function toIdSet(values) {
@@ -749,7 +827,7 @@
                     }
                     try {
                         await fetchJson(`/api/columns/${columnId}`, { method: 'DELETE' });
-                        await refreshBoard();
+                        scheduleConsistencyRefresh();
                     } catch (error) {
                         alert(error.message ?? 'Nie udało się usunąć kolumny.');
                     }
@@ -783,6 +861,7 @@
                         return;
                     }
                     cardModalState.isOpening = true;
+                    const requestId = ++cardModalState.requestId;
                     try {
                         cardForm.reset();
                         if (cardForm.dueAt) {
@@ -791,47 +870,155 @@
                         hideError(cardErrorBox);
                         renderComments([]);
                         renderTimeEntries([]);
+                        resetCommentComposer();
                         renderAssigneeSelector();
                         cardForm.cardId.value = cardId ?? '';
                         cardForm.columnId.value = columnId ?? '';
                         setCardModalMode(false);
 
                         if (cardId) {
+                            const cachedCard = findCardInState(cardId);
+                            if (cachedCard) {
+                                fillCardForm(cardForm, cachedCard);
+                                renderAssigneeSelector(cachedCard.assignees ?? []);
+                                setCardModalMode(true);
+                            }
+                            renderCommentsLoading();
+                            renderTimeEntriesLoading();
+                        }
+
+                        cardModal.show();
+
+                        if (cardId) {
                             try {
                                 const { card, comments, timeEntries } = await fetchJson(`/api/cards/${cardId}`);
+                                if (requestId !== cardModalState.requestId) {
+                                    return;
+                                }
                                 fillCardForm(cardForm, card);
                                 renderComments(comments);
                                 renderTimeEntries(timeEntries);
                                 renderAssigneeSelector(card.assignees ?? []);
                                 setCardModalMode(true);
                             } catch (error) {
+                                if (requestId !== cardModalState.requestId) {
+                                    return;
+                                }
                                 alert(error.message ?? 'Nie udało się załadować karty.');
                                 setCardModalMode(false);
                                 return;
                             }
                         }
 
-                        cardModal.show();
                         cardForm.title.focus();
                     } finally {
                         cardModalState.isOpening = false;
                     }
                 }
 
-                function renderComments(comments) {
+                function findCardInState(cardId) {
+                    if (!boardState || !Array.isArray(boardState.columns)) {
+                        return null;
+                    }
+
+                    for (const column of boardState.columns) {
+                        if (!Array.isArray(column.cards)) {
+                            continue;
+                        }
+
+                        const card = column.cards.find((item) => String(item.id) === String(cardId));
+                        if (card) {
+                            return card;
+                        }
+                    }
+
+                    return null;
+                }
+
+                function renderCommentsLoading() {
                     const container = document.getElementById('card-comments');
                     if (!container) {
                         return;
                     }
+                    container.innerHTML = '<li class="list-group-item text-muted">Ładowanie komentarzy...</li>';
+                }
+
+                function renderTimeEntriesLoading() {
+                    const container = document.getElementById('card-time-entries');
+                    if (!container) {
+                        return;
+                    }
+                    container.innerHTML = '<li class="list-group-item text-muted">Ładowanie historii czasu...</li>';
+                }
+
+                function renderComments(comments) {
+                    const container = commentsContainer;
+                    if (!container) {
+                        return;
+                    }
+                    latestComments = Array.isArray(comments) ? comments : [];
                     container.innerHTML = '';
-                    comments?.forEach((comment) => {
+                    latestComments.forEach((comment) => {
+                        const actionButtons = [];
+                        if (canEditComment(comment)) {
+                            actionButtons.push(`<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-action="edit-comment" data-comment-id="${comment.id}">Edytuj</button>`);
+                        }
+                        if (canDeleteComment(comment)) {
+                            actionButtons.push(`<button type="button" class="btn btn-link btn-sm p-0 text-danger text-decoration-none" data-action="delete-comment" data-comment-id="${comment.id}">Usuń</button>`);
+                        }
                         const li = document.createElement('li');
                         li.className = 'list-group-item';
-                        li.innerHTML = `<div class="fw-semibold">${escapeHtml(comment.author.displayName)}</div>
-                            <div class="small text-muted">${formatDate(comment.createdAt)}</div>
+                        li.style.padding = '0.9rem 1rem';
+                        li.innerHTML = `<div class="comment-item-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:nowrap;">
+                                <div class="comment-item-meta" style="flex:1 1 auto;min-width:0;padding-right:.75rem;">
+                                    <div class="fw-semibold">${escapeHtml(comment.author.displayName)}</div>
+                                    <div class="small text-muted">${formatDate(comment.createdAt)}</div>
+                                </div>
+                                ${actionButtons.length ? `<div class="comment-item-actions" style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;flex:0 0 auto;margin-left:auto;white-space:nowrap;text-align:right;">${actionButtons.join('')}</div>` : ''}
+                            </div>
                             <p class="mb-0">${escapeHtml(comment.content)}</p>`;
                         container.appendChild(li);
                     });
+                }
+
+                function canEditComment(comment) {
+                    return Number(comment?.author?.id) === currentUserId;
+                }
+
+                function canDeleteComment(comment) {
+                    if (Number(comment?.author?.id) === currentUserId) {
+                        return true;
+                    }
+
+                    return ['owner', 'admin'].includes(getCurrentUserBoardRole());
+                }
+
+                function getCurrentUserBoardRole() {
+                    if (!Array.isArray(boardState?.members)) {
+                        return '';
+                    }
+
+                    const currentMember = boardState.members.find((member) => Number(member.id) === currentUserId);
+
+                    return currentMember?.role ?? '';
+                }
+
+                function resetCommentComposer() {
+                    editingCommentId = null;
+                    if (commentContent) {
+                        commentContent.value = '';
+                    }
+                    updateCommentComposerUi();
+                }
+
+                function updateCommentComposerUi() {
+                    const isEditing = Boolean(editingCommentId);
+                    if (addCommentButton) {
+                        addCommentButton.textContent = isEditing ? 'Zapisz komentarz' : 'Dodaj komentarz';
+                    }
+                    if (cancelCommentEditButton) {
+                        cancelCommentEditButton.classList.toggle('d-none', !isEditing);
+                    }
                 }
 
                 function renderTimeEntries(entries) {
@@ -949,7 +1136,7 @@
                             method: 'PATCH',
                             body: JSON.stringify(payload),
                         });
-                        await refreshBoard();
+                        scheduleConsistencyRefresh();
                     } catch (error) {
                         alert(error.message ?? 'Nie udało się przenieść karty.');
                         await refreshBoard();
@@ -1080,13 +1267,20 @@
                     }
                 }
 
+                if (cardModalEl) {
+                    cardModalEl.addEventListener('hidden.bs.modal', () => {
+                        latestComments = [];
+                        resetCommentComposer();
+                    });
+                }
+
                 function startRealtimeUpdates(endpoint, onSnapshot) {
                     if (!endpoint || typeof onSnapshot !== 'function') {
                         return;
                     }
 
-                    const WAIT_TIMEOUT_MS = 15000;
-                    const MIN_DELAY_MS = 250;
+                    const WAIT_TIMEOUT_MS = 0;
+                    const MIN_DELAY_MS = 3000;
                     const MAX_DELAY_MS = 10000;
                     let nextDelay = MIN_DELAY_MS;
 
@@ -1120,7 +1314,6 @@
                                 if (latestWithSnapshot?.snapshot) {
                                     onSnapshot(latestWithSnapshot.snapshot);
                                 }
-                                await refreshBoard();
                             }
 
                             const retryCandidate = Number(data?.retry);
@@ -1230,7 +1423,7 @@
     </div>
 </div>
 
-<section class="board-wrapper" data-board='{{ boardDataJson|e('html_attr') }}' data-updates="{{ updatesUrl|e('html_attr') }}" data-updates-cursor="{{ (updatesCursor ?? '')|e('html_attr') }}" data-board-id="{{ board.id }}" data-board-slug="{{ board.slug }}">
+<section class="board-wrapper" data-board='{{ boardDataJson|e('html_attr') }}' data-updates="{{ updatesUrl|e('html_attr') }}" data-updates-cursor="{{ (updatesCursor ?? '')|e('html_attr') }}" data-board-id="{{ board.id }}" data-board-slug="{{ board.slug }}" data-current-user-id="{{ app.user.id }}">
     <div class="board-canvas" id="board-canvas">
         {% for column in boardData.columns %}
             {% set columnStatus = column.status|default('')|lower %}
